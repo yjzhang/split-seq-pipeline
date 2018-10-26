@@ -11,7 +11,7 @@ Software needed:
 
 To install all dependencies at once, try running `install_dependencies.sh`.
 
-## Installation
+## Running the pipeline
 
 
 ## References
