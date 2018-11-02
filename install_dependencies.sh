@@ -20,36 +20,44 @@ fi
 echo "Installing STAR..."
 # TODO: test if STAR already exists
 
-wget https://github.com/alexdobin/STAR/archive/2.6.1c.tar.gz
-tar -xzf 2.6.1c.tar.gz
-cd STAR-2.6.1c
-cd source
-make STAR
-cp STAR ../../bin
+if [ -x "$(command -v STAR)" ]; then
+    wget https://github.com/alexdobin/STAR/archive/2.6.1c.tar.gz
+    tar -xzf 2.6.1c.tar.gz
+    cd STAR-2.6.1c
+    cd source
+    make STAR
+    cp STAR ../../bin
+fi
+echo "STAR is installed"
 
 cd $install_dir
 
 # install starcode
 echo "Installing starcode..."
 
-wget https://github.com/gui11aume/starcode/archive/1.3.tar.gz
-tar -xzf 1.3.tar.gz
-cd starcode-1.3
-cd starcode
-make
-cp starcode ../bin
+if [ -x "$(command -v starcode)" ]; then
+    wget https://github.com/gui11aume/starcode/archive/1.3.tar.gz
+    tar -xzf 1.3.tar.gz
+    cd starcode-1.3
+    cd starcode
+    make
+    cp starcode ../bin
+fi
+echo "starcode is installed"
 
 cd $install_dir
 
 # install samtools
 
-wget https://github.com/samtools/samtools/releases/download/1.9/samtools-1.9.tar.bz2
-tar -xf samtools-1.9.tar.bz2
-cd samtools-1.9
-./configure --prefix=$install_dir/bin
-make
-make install
-cp samtools ../bin
+if [ -x "$(command -v samtools)" ]; then
+    wget https://github.com/samtools/samtools/releases/download/1.9/samtools-1.9.tar.bz2
+    tar -xf samtools-1.9.tar.bz2
+    cd samtools-1.9
+    ./configure --prefix=$install_dir/bin
+    make
+    make install
+    cp samtools ../bin
+fi
 
 cd $install_dir
 
