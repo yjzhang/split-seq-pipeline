@@ -1,3 +1,36 @@
 #!/usr/bin/env python
 
+# TODO:
+# 1. argparse to parse arguments
+#    Which arguments should there be???
+# should we use snakemake?
+
+# Arguments:
+# - fastq1 (read1 - actual sequencing read)
+# - fastq2 (read2 - header)
+# - output_dir
+
+# algorithm steps:
+# 1. convert fastq to unaligned bam
+# 2. copy header
+# 3. trim read2 to UMI-BC3-BC2-BC1
+# 4. 
+
+import argparse
+import tools
+
+parser = argparse.ArgumentParser()
+
+parser.add_argument('fq1', help='fastq1')
+parser.add_argument('fq2', help='fastq2')
+parser.add_argument('output_dir', help='output dir')
+parser.add_argument('--picard_dir', default='./', help='path containing picard.jar')
+parser.add_argument('--genome_dir', default='./', help='path containing reference genome')
+
+args = parser.parse_args()
+
+print(args)
+print(args.fq1)
+print(args.fq2)
+print(args.output_dir)
 

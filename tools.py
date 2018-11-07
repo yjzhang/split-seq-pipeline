@@ -7,12 +7,18 @@ import sys
 PATH = './'
 
 
-def fastq_to_bam(fastq1, fastq2, output_dir):
+def fastq_to_bam(fastq1, fastq2, output_dir, picard_dir):
     """
     calls picard to convert the fastq file to an unaligned bam file.
     """
-    picard_path = os.path.join(PATH, 'picard.jar')
-    subprocess.call('java -jar {3} FastqToSam F1={0} F2={1} O={2}/single_cells.bam SM=1'.format(fastq1, fastq2, output_dir, picard_path))
+    picard_path = os.path.join(picard_dir, 'picard.jar')
+    rc = subprocess.call('java -jar {3} FastqToSam F1={0} F2={1} O={2}/single_cells.bam SM=1'.format(fastq1, fastq2, output_dir, picard_path))
+    return rc
+
+def copy_header():
+    """
+    """
+
 
 def download_genome(genome_dir, ref='hg19'):
     """
