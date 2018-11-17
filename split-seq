@@ -21,8 +21,14 @@ import tools
 
 parser = argparse.ArgumentParser()
 
-parser.add_argument('fq1', help='fastq1')
-parser.add_argument('fq2', help='fastq2')
+parser.add_argument('mode', help="""Mode: one of "all", "preproc", "star", or "postproc".
+"all" runs the entire pipeline.
+"preproc" or "preprocess" runs all the steps prior to running STAR, producing a file called single_cells_barcoded_head.fastq in output_dir.
+"star" assumes that output of preproc exists in output_dir, and tries to run the STAR alignment, producing a file called single_cells_barcoded_headAligned.out.sam.
+"postproc" assumes that the output of star exists in  output_dir.
+""")
+parser.add_argument('fq1', help='fastq1 - mRNA reads')
+parser.add_argument('fq2', help='fastq2 - reads contain UMI and barcodes')
 parser.add_argument('output_dir', help='output dir')
 parser.add_argument('--picard_dir', default='./', help='path containing picard.jar')
 parser.add_argument('--genome_dir', default='./', help='path containing reference genome')
@@ -30,7 +36,17 @@ parser.add_argument('--genome_dir', default='./', help='path containing referenc
 args = parser.parse_args()
 
 print(args)
+print(args.mode)
 print(args.fq1)
 print(args.fq2)
 print(args.output_dir)
 
+mode = args.mode.lower()
+if mode == 'all':
+    pass
+if mode == 'preproc' or mode == 'preprocess' or mode == 'preprocessing':
+    pass
+if mode == 'star':
+    pass
+if mode == 'postproc' or mode == 'postprocess' or mode == 'postprocessing':
+    pass
