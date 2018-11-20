@@ -189,6 +189,10 @@ def run_star(genome_dir, output_dir):
     rc = subprocess.call("""STAR --genomeDir {0}/ --runThreadN 8 --readFilesIn {1}/single_cells_barcoded_head.fastq --outFileNamePrefix {1}/single_cells_barcoded_head""".format(genome_dir, output_dir), shell=True)
     return rc
 
+def sort_sam(output_dir):
+    rc = subprocess.call("""samtools sort -n -T {0}/single_cells_barcoded_headAligned.sort -o {0}/single_cells_barcoded_headAligned.sorted.bam {0}/single_cells_barcoded_headAligned.out.sam""".format(output_dir), shell=True)
+    return rc
+
 def run_postprocessing(input_dir, output_dir):
     """
     """

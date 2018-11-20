@@ -53,4 +53,4 @@ if mode == 'preproc' or mode == 'preprocess' or mode == 'preprocessing':
 if mode == 'star':
     tools.run_star(args.genome_dir, args.output_dir)
 if mode == 'postproc' or mode == 'postprocess' or mode == 'postprocessing':
-    pass
+    tools.sort_sam(args.output_dir)
