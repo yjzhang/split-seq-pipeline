@@ -33,6 +33,7 @@ parser.add_argument('output_dir', help='output dir')
 parser.add_argument('--chemistry', default='v1', help='Using v1 or v2 chemistry')
 parser.add_argument('--picard_dir', default='./', help='path containing picard.jar')
 parser.add_argument('--genome_dir', default='./', help='path containing reference genome')
+parser.add_argument('--star_path', default='./', help='path containing STAR')
 
 args = parser.parse_args()
 
@@ -42,6 +43,7 @@ print(args.fq1)
 print(args.fq2)
 print(args.output_dir)
 print(args.chemistry)
+print(args.genome_dir)
 
 mode = args.mode.lower()
 if mode == 'all':
@@ -49,6 +51,6 @@ if mode == 'all':
 if mode == 'preproc' or mode == 'preprocess' or mode == 'preprocessing':
     tools.preprocess_fastq(args.fq1, args.fq2, args.output_dir, args.chemistry)
 if mode == 'star':
-    pass
+    tools.run_star(args.genome_dir, args.output_dir)
 if mode == 'postproc' or mode == 'postprocess' or mode == 'postprocessing':
     pass
