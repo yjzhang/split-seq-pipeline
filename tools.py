@@ -119,7 +119,10 @@ def preprocess_fastq(fastq1, fastq2, output_dir, **params):
         bc_starts.append(bc_loc + c)
         c = bc_starts[-1] + bc_len
 
-    # Generate bc_map dictionary for each cell barcode. 
+    # Read in barcode sequences
+    bc_8nt = pd.read_csv('./barcodes/bc_8nt_v1.csv',names=['barcode'],index_col=0).barcode
+    
+    # Generate bc_map dictionary for each cell barcode.
     bc3_pre = amp_seq[bc_starts[0]-2:bc_starts[0]]
     bc3_suf = amp_seq[bc_starts[0]+8:bc_starts[0]+10]
     bc3_map = bc_editd1_correction(bc_8nt.values,
