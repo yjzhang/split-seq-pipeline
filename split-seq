@@ -45,7 +45,7 @@ mode = args.mode.lower()
 if mode == 'all':
     pass
 if mode == 'preproc' or mode == 'preprocess' or mode == 'preprocessing':
-    pass
+    tools.preprocess_fastq(args.fq1, args.fq2, args.output_dir)
 if mode == 'star':
     pass
 if mode == 'postproc' or mode == 'postprocess' or mode == 'postprocessing':
