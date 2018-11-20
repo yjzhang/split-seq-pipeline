@@ -30,6 +30,7 @@ parser.add_argument('mode', help="""Mode: one of "all", "preproc", "star", or "p
 parser.add_argument('fq1', help='fastq1 - mRNA reads')
 parser.add_argument('fq2', help='fastq2 - reads contain UMI and barcodes')
 parser.add_argument('output_dir', help='output dir')
+parser.add_argument('--chemistry', default='v1', help='Using v1 or v2 chemistry')
 parser.add_argument('--picard_dir', default='./', help='path containing picard.jar')
 parser.add_argument('--genome_dir', default='./', help='path containing reference genome')
 
@@ -40,12 +41,13 @@ print(args.mode)
 print(args.fq1)
 print(args.fq2)
 print(args.output_dir)
+print(args.chemistry)
 
 mode = args.mode.lower()
 if mode == 'all':
     pass
 if mode == 'preproc' or mode == 'preprocess' or mode == 'preprocessing':
-    tools.preprocess_fastq(args.fq1, args.fq2, args.output_dir)
+    tools.preprocess_fastq(args.fq1, args.fq2, args.output_dir, args.chemistry)
 if mode == 'star':
     pass
 if mode == 'postproc' or mode == 'postprocess' or mode == 'postprocessing':

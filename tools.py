@@ -29,7 +29,7 @@ def download_genome(genome_dir, ref='hg19'):
     """
     # TODO: find the hg19 genome???
 
-def preprocess_fastq(fastq1, fastq2, output_dir, **params):
+def preprocess_fastq(fastq1, fastq2, output_dir, chemistry='v1', **params):
     """
     Performs all the steps before running the alignment. Temporary files
     saved in output_dir.
@@ -112,8 +112,17 @@ def preprocess_fastq(fastq1, fastq2, output_dir, **params):
             bc_fixed = ''
         return bc_fixed
 
-    # Amplicon sequence
-    amp_seq = 'NNNNNNNNNNIIIIIIIIGTGGCCGATGTTTCGCATCGGCGTACGACTIIIIIIIIATCCACGTGCTTGAGAGGCCAGAGCATTCGIIIIIIII'
+    # Read in barcode sequences
+    bc_8nt = pd.read_csv(PATH + '/barcodes/bc_8nt_v1.csv',names=['barcode'],index_col=0).barcode
+
+    if chemistry=='v1':
+        bc_8nt_RT = bc_8nt
+        # Amplicon sequence
+        amp_seq = 'NNNNNNNNNNIIIIIIIIGTGGCCGATGTTTCGCATCGGCGTACGACTIIIIIIIIATCCACGTGCTTGAGAGGCCAGAGCATTCGIIIIIIII'
+    else:
+        bc_8nt_RT = pd.read_csv(PATH + '/barcodes/bc_8nt_v2.csv',names=['barcode'],index_col=0).barcode
+        # Amplicon sequence
+        amp_seq = 'NNNNNNNNNNIIIIIIIIGTGGCCGATGTTTCGCATCGGCGTACGACTIIIIIIIIATCCACGTGCTTGAGACTGTGGIIIIIIII'
 
     # Get location of cell barcodes in amplicon:
     bc_len = 8
@@ -125,9 +134,6 @@ def preprocess_fastq(fastq1, fastq2, output_dir, **params):
             break
         bc_starts.append(bc_loc + c)
         c = bc_starts[-1] + bc_len
-
-    # Read in barcode sequences
-    bc_8nt = pd.read_csv(PATH + '/barcodes/bc_8nt_v1.csv',names=['barcode'],index_col=0).barcode
     
     # Generate bc_map dictionary for each cell barcode.
     bc3_pre = amp_seq[bc_starts[0]-2:bc_starts[0]]
@@ -143,21 +149,21 @@ def preprocess_fastq(fastq1, fastq2, output_dir, **params):
                                    bc_suf=bc2_suf)
     bc1_pre = amp_seq[bc_starts[2]-2:bc_starts[2]]
     bc1_suf = 'N'
-    bc1_map = bc_editd1_correction(bc_8nt.values,
+    bc1_map = bc_editd1_correction(bc_8nt_RT.values,
                                    bc_pre=bc1_pre,
                                    bc_suf=bc1_suf,
                                    bc_start=1,
                                    bc_end=10)
 
-    with gzip.open(fastq1,'rb') as f1, gzip.open(fastq2,'rb') as f2, open(output_dir + 'read1_cellbarcode_headers.fastq','w') as fout:
+    with gzip.open(fastq1,'rb') as f1, gzip.open(fastq2,'rb') as f2, open(output_dir + 'single_cells_barcoded_head.fastq','w') as fout:
         while True:
             header2 = f2.readline()
             if len(header2)==0:
                 break
             seq2 = f2.readline().decode("utf-8")
-            bc1 = fix_bc(seq2[86-1:94],bc1_map)
-            bc2 = fix_bc(seq2[48-1:56+1],bc2_map)
-            bc3 = fix_bc(seq2[10-1:18+1],bc3_map)
+            bc1 = fix_bc(seq2[bc_starts[2]-1:bc_starts[2]+bc_len],bc1_map)
+            bc2 = fix_bc(seq2[bc_starts[1]-1:bc_starts[1]+bc_len+1],bc2_map)
+            bc3 = fix_bc(seq2[bc_starts[0]-1:bc_starts[0]+bc_len+1],bc3_map)
             umi = seq2[:10]
             strand2 = f2.readline()
             qual2 = f2.readline()
