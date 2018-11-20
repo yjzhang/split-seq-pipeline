@@ -4,10 +4,17 @@ import shlex
 import subprocess
 import sys
 
-import HTSeq
+import pandas as pd
+from collections import defaultdict
+import gzip
+from pylab import *
+
+
+#import HTSeq
 import pysam
 
-PATH = './'
+#PATH = './'
+PATH = os.path.dirname(__file__)
 
 def filter_qual_scores_umi(input_samfile):
     """
@@ -120,7 +127,7 @@ def preprocess_fastq(fastq1, fastq2, output_dir, **params):
         c = bc_starts[-1] + bc_len
 
     # Read in barcode sequences
-    bc_8nt = pd.read_csv('./barcodes/bc_8nt_v1.csv',names=['barcode'],index_col=0).barcode
+    bc_8nt = pd.read_csv(PATH + '/barcodes/bc_8nt_v1.csv',names=['barcode'],index_col=0).barcode
     
     # Generate bc_map dictionary for each cell barcode.
     bc3_pre = amp_seq[bc_starts[0]-2:bc_starts[0]]
@@ -151,7 +158,7 @@ def preprocess_fastq(fastq1, fastq2, output_dir, **params):
             bc1 = fix_bc(seq2[86-1:94],bc1_map)
             bc2 = fix_bc(seq2[48-1:56+1],bc2_map)
             bc3 = fix_bc(seq2[10-1:18+1],bc3_map)
-            umi = seq[:10]
+            umi = seq2[:10]
             strand2 = f2.readline()
             qual2 = f2.readline()
             
