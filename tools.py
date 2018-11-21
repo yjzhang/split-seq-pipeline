@@ -35,6 +35,9 @@ def preprocess_fastq(fastq1, fastq2, output_dir, chemistry='v1', **params):
     saved in output_dir.
     """
     
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+    
     bases = list('ACGT')
     def convert_degen_seq_to_list(seq):
         """Uses recursion to convert a degenerate sequence to a list
