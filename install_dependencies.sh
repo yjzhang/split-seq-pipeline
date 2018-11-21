@@ -9,12 +9,12 @@ cd $install_dir
 mkdir bin
 
 # append to path?
-if echo $PATH | grep -q $1; then
-    echo "PATH contains dir"
-else
-    export PATH=$1/bin:$PATH
-    echo "\nexport PATH=$1/bin:$PATH" >> ~/.bashrc
-fi
+#if echo $PATH | grep -q $1; then
+#    echo "PATH contains dir"
+#else
+#    export PATH=$1/bin:$PATH
+#    echo "\nexport PATH=$1/bin:$PATH" >> ~/.bashrc
+#fi
 
 # install STAR
 echo "Installing STAR..."
