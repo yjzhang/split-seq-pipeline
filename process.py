@@ -167,7 +167,7 @@ def molecule_info(gtf, output_dir, gtf_dict_stepsize=10000):
     # Collapse similar UMIs for the same gene-cell_barcode combination. Write output info for
     # each UMI (cell_barcode, gene, UMI, count) to a file (read_assignment.csv).
 
-    output_filename = output_dir +'read_assignment.csv'
+    output_filename = output_dir +'/read_assignment.csv'
     with open(output_filename,'w') as f:
         f.write('cell_barcode,gene,umi,counts\n')
 
@@ -225,3 +225,13 @@ def molecule_info(gtf, output_dir, gtf_dict_stepsize=10000):
             sys.stdout.flush()
             #pass
     samfile.close()
+
+    # Log the total reads mapped to transcriptome and total UMIs
+    total_read_count = 0
+    with open(output_dir +'/read_assignment.csv') as f:
+        for i, l in enumerate(f):
+            if i>0:
+                total_read_count += int(l.split(',')[-1][:-1])
+    with open(output_dir + '/pipeline_stats.txt', 'a') as f:
+        f.write('mapped_to_transcriptome\t%d\n' %total_read_count)
+        f.write('total_umis\t%d\n' %i)

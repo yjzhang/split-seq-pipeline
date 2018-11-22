@@ -37,7 +37,7 @@ def preprocess_fastq(fastq1, fastq2, output_dir, chemistry='v1', **params):
     
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
-    
+
     bases = list('ACGT')
     def convert_degen_seq_to_list(seq):
         """Uses recursion to convert a degenerate sequence to a list
@@ -158,6 +158,9 @@ def preprocess_fastq(fastq1, fastq2, output_dir, chemistry='v1', **params):
                                    bc_start=1,
                                    bc_end=10)
 
+    
+    fastq_reads = 0
+    fastq_valid_barcode_reads = 0
     with gzip.open(fastq1,'rb') as f1, gzip.open(fastq2,'rb') as f2, open(output_dir + 'single_cells_barcoded_head.fastq','w') as fout:
         while True:
             header2 = f2.readline()
@@ -183,6 +186,12 @@ def preprocess_fastq(fastq1, fastq2, output_dir, chemistry='v1', **params):
                 fout.write(seq1)
                 fout.write(strand1)
                 fout.write(qual1)
+                fastq_valid_barcode_reads += 1
+            fastq_reads += 1
+
+    with open(output_dir + '/pipeline_stats.txt', 'w') as f:
+        f.write('fastq_reads\t%d\n' %fastq_reads)
+        f.write('fastq_valid_barcode_reads\t%d\n' %fastq_valid_barcode_reads)
 
     return 0
 
@@ -190,6 +199,19 @@ def run_star(genome_dir, output_dir):
     """
     """
     rc = subprocess.call("""STAR --genomeDir {0}/ --runThreadN 8 --readFilesIn {1}/single_cells_barcoded_head.fastq --outFileNamePrefix {1}/single_cells_barcoded_head""".format(genome_dir, output_dir), shell=True)
+    
+    # Add alignment stats to pipeline_stats
+    with open(output_dir + '/single_cells_barcoded_headLog.final.out') as f:
+        for i in range(8):
+            f.readline()
+        unique_mapping = int(f.readline().split('\t')[1][:-1])
+        for i in range(14):
+            f.readline()
+        multimapping = int(f.readline().split('\t')[1][:-1])
+    with open(output_dir + '/pipeline_stats.txt', 'a') as f:
+        f.write('uniquely_aligned\t%d\n' %unique_mapping)
+        f.write('multimapping\t%d\n' %multimapping)
+
     return rc
 
 def sort_sam(output_dir):
