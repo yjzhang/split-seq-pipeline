@@ -4,6 +4,7 @@ import os
 import shlex
 import subprocess
 import sys
+from multiprocessing import Process
 
 import pandas as pd
 from collections import defaultdict
@@ -96,8 +97,55 @@ def collapse_umis_dataframe(df):
         counts_df = counts_df[['umi','counts']]
     return counts_df
 
-def molecule_info(gtf, output_dir, gtf_dict_stepsize=10000):
+def split_bam(output_dir, nthreads):
+    samfile = pysam.Samfile(output_dir + '/single_cells_barcoded_headAligned.sorted.bam')
+    samfile_chunks = {}
+    for i in range(nthreads):
+        samfile_chunks[i] = pysam.Samfile(output_dir + '/single_cells_barcoded_headAligned.sorted.chunk%d.bam' %(i+1),'wb', template=samfile)
+        
+    # Get the total number of aligned reads:
+    aligned_reads = 0
+    with open(output_dir + '/pipeline_stats.txt') as f:
+        f.readline()
+        f.readline()
+        aligned_reads += int(f.readline()[:-1].split('\t')[1])
+        aligned_reads += int(f.readline()[:-1].split('\t')[1])
+
+    # Number of reads per file. Round up to ensure we don't write (nthreads +1) files.
+    reads_per_chunk = int(ceil(aligned_reads/nthreads))
+
+    c = 0
+    prev_cell_barcode = ''
+    d = 0
+    reads = []
+    for read in samfile:
+        if not read.is_secondary:
+            reads.append(read)
+            cell_barcode = read.qname[:24]
+            # Only write reads once all reads for a cell have been loaded to avoid
+            # splitting one transcriptome into multiple files:
+            if cell_barcode!=prev_cell_barcode:
+                chunk = int(floor(c/reads_per_chunk))
+                for r in reads[:-1]:
+                    samfile_chunks[chunk].write(r)
+                reads = reads[-1:]
+                d += 1
+            prev_cell_barcode = cell_barcode
+            c+=1
+            
+    for i in range(nthreads):
+        samfile_chunks[i].close()
+    samfile.close()
+
+def molecule_info_chunk(gtf, output_dir, chunk=None, gtf_dict_stepsize=10000):
     bamfile = output_dir + '/single_cells_barcoded_headAligned.sorted.bam'
+
+    if chunk is None:
+        bamfile = output_dir + '/single_cells_barcoded_headAligned.sorted.bam'
+        output_filename = output_dir +'/read_assignment.csv'
+    else:
+        bamfile = output_dir + '/single_cells_barcoded_headAligned.sorted.chunk%d.bam' %chunk
+        output_filename = output_dir +'/read_assignment.chunk%d.csv' %chunk
 
     # Load gtf
     names = ['chrom',
@@ -167,7 +215,6 @@ def molecule_info(gtf, output_dir, gtf_dict_stepsize=10000):
     # Collapse similar UMIs for the same gene-cell_barcode combination. Write output info for
     # each UMI (cell_barcode, gene, UMI, count) to a file (read_assignment.csv).
 
-    output_filename = output_dir +'/read_assignment.csv'
     with open(output_filename,'w') as f:
         f.write('cell_barcode,gene,umi,counts\n')
 
@@ -235,3 +282,28 @@ def molecule_info(gtf, output_dir, gtf_dict_stepsize=10000):
     with open(output_dir + '/pipeline_stats.txt', 'a') as f:
         f.write('mapped_to_transcriptome\t%d\n' %total_read_count)
         f.write('total_umis\t%d\n' %i)
+
+def join_read_assignment_files(output_dir, nthreads):
+    filenames = [output_dir + 'read_assignment.chunk%d.csv' for i in range(1,nthreads+1)]
+    with open(output_dir + '/read_assignment.csv', 'w') as outfile:
+        for fname in filenames:
+            with open(fname) as infile:
+                for line in infile:
+                    outfile.write(line)
+
+def molecule_info(gtf_file, output_dir, nthreads):
+    """ Gets molecular info for a bam file. Splits the bamfile into 
+    nthread chunks and runs in parallel """
+
+    split_bam(output_dir, int(nthreads))
+
+    Pros = []
+    for i in range(1,int(nthreads)+1):
+        print('Starting thread %d' %i)
+        p = Process(target=molecule_info_chunk, args=(gtf_file, output_dir, i))
+        Pros.append(p)
+        p.start()
+    for t in Pros:
+        t.join()
+
+    join_read_assignment_files(output_dir, nthreads)
