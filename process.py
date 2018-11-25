@@ -273,18 +273,8 @@ def molecule_info_chunk(gtf, output_dir, chunk=None, gtf_dict_stepsize=10000):
             #pass
     samfile.close()
 
-    # Log the total reads mapped to transcriptome and total UMIs
-    total_read_count = 0
-    with open(output_dir +'/read_assignment.csv') as f:
-        for i, l in enumerate(f):
-            if i>0:
-                total_read_count += int(l.split(',')[-1][:-1])
-    with open(output_dir + '/pipeline_stats.txt', 'a') as f:
-        f.write('mapped_to_transcriptome\t%d\n' %total_read_count)
-        f.write('total_umis\t%d\n' %i)
-
 def join_read_assignment_files(output_dir, nthreads):
-    filenames = [output_dir + 'read_assignment.chunk%d.csv' for i in range(1,nthreads+1)]
+    filenames = [output_dir + 'read_assignment.chunk%d.csv' %i for i in range(1,nthreads+1)]
     with open(output_dir + '/read_assignment.csv', 'w') as outfile:
         for fname in filenames:
             with open(fname) as infile:
@@ -307,3 +297,13 @@ def molecule_info(gtf_file, output_dir, nthreads):
         t.join()
 
     join_read_assignment_files(output_dir, nthreads)
+
+    # Log the total reads mapped to transcriptome and total UMIs
+    total_read_count = 0
+    with open(output_dir +'/read_assignment.csv') as f:
+        for i, l in enumerate(f):
+            if i>0:
+                total_read_count += int(l.split(',')[-1][:-1])
+    with open(output_dir + '/pipeline_stats.txt', 'a') as f:
+        f.write('mapped_to_transcriptome\t%d\n' %total_read_count)
+        f.write('total_umis\t%d\n' %i)
