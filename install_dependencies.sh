@@ -9,12 +9,12 @@ cd $install_dir
 mkdir bin
 
 # append to path?
-if echo $PATH | grep -q $1; then
-    echo "PATH contains dir"
-else
-    export PATH=$1/bin:$PATH
-    echo "\nexport PATH=$1/bin:$PATH" >> ~/.bashrc
-fi
+#if echo $PATH | grep -q $1; then
+#    echo "PATH contains dir"
+#else
+#    export PATH=$1/bin:$PATH
+#    echo "\nexport PATH=$1/bin:$PATH" >> ~/.bashrc
+#fi
 
 # install STAR
 echo "Installing STAR..."
@@ -31,22 +31,7 @@ fi
 echo "STAR is installed"
 
 cd $install_dir
-
-# install starcode
-echo "Installing starcode..."
-
-if [ -x "$(command -v starcode)" ]; then
-    wget https://github.com/gui11aume/starcode/archive/1.3.tar.gz
-    tar -xzf 1.3.tar.gz
-    cd starcode-1.3
-    cd starcode
-    make
-    cp starcode ../bin
-fi
-echo "starcode is installed"
-
-cd $install_dir
-
+j
 # install samtools
 
 if [ -x "$(command -v samtools)" ]; then
@@ -59,10 +44,5 @@ if [ -x "$(command -v samtools)" ]; then
     cp samtools ../bin
 fi
 
-cd $install_dir
-
-# install picard
-wget https://github.com/broadinstitute/picard/releases/download/2.18.14/picard.jar
-mv picard.jar bin/
-
+echo "samtools is installed"
 

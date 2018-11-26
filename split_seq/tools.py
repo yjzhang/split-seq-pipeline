@@ -7,21 +7,15 @@ import sys
 import pandas as pd
 from collections import defaultdict
 import gzip
-from pylab import *
+#from pylab import *
+from numpy import unique
 
 
 #import HTSeq
-import pysam
+#import pysam
 
 #PATH = './'
 PATH = os.path.dirname(__file__)
-
-def filter_qual_scores_umi(input_samfile):
-    """
-    """
-    # TODO: filter by quality score - allow only one bp with phred<20 in UMI, and another one in BC.
-    af = pysam.AlignmentFile(input_samfile)
-
 
 def download_genome(genome_dir, ref='hg19'):
     """
@@ -221,7 +215,3 @@ def sort_sam(output_dir, nthreads):
     nthreads = int(nthreads)
     rc = subprocess.call("""samtools sort -n -@ {1} -T {0}/single_cells_barcoded_headAligned.sort -o {0}/single_cells_barcoded_headAligned.sorted.bam {0}/single_cells_barcoded_headAligned.out.sam""".format(output_dir, nthreads), shell=True)
     return rc
-
-def run_postprocessing(input_dir, output_dir):
-    """
-    """
