@@ -17,8 +17,7 @@
 # 4. 
 
 import argparse
-import tools
-import process
+from split_seq import tools, process
 import datetime
 
 parser = argparse.ArgumentParser()
@@ -33,9 +32,9 @@ parser.add_argument('fq1', help='fastq1 - mRNA reads')
 parser.add_argument('fq2', help='fastq2 - reads contain UMI and barcodes')
 parser.add_argument('output_dir', help='output dir')
 parser.add_argument('--chemistry', default='v1', help='Using v1 or v2 chemistry')
-parser.add_argument('--picard_dir', default='./', help='path containing picard.jar')
 parser.add_argument('--genome_dir', default='./', help='path containing reference genome')
-parser.add_argument('--star_path', default='./', help='path containing STAR')
+# TODO: this is currently unused
+#parser.add_argument('--star_path', default='./', help='path containing STAR')
 parser.add_argument('--gtf_file', default='./', help='GTF file with gene annotations')
 parser.add_argument('--nthreads', default='4', help='number of threads to use')
 
