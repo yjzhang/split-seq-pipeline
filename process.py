@@ -138,6 +138,8 @@ def split_bam(output_dir, nthreads):
     samfile.close()
 
 def molecule_info_chunk(gtf, output_dir, chunk=None, gtf_dict_stepsize=10000):
+    """ Gets the molecular info for each UMI in a bamfile.
+    """
     bamfile = output_dir + '/single_cells_barcoded_headAligned.sorted.bam'
 
     if chunk is None:
@@ -164,6 +166,7 @@ def molecule_info_chunk(gtf, output_dir, chunk=None, gtf_dict_stepsize=10000):
     gtf['gene_id'] = gtf.tags.apply(lambda s:s.split('gene_id "')[-1].split('";')[0])
     gtf['gene_biotype'] = gtf.tags.apply(lambda s:s.split('gene_biotype "')[-1].split('";')[0])
     gtf['gene_name'] = gtf.tags.apply(lambda s:s.split('gene_name "')[-1].split('";')[0])
+    
     # If gene has no name, use gene ID
     genes_no_name = gtf['gene_name'].str.contains('gene_id')
     gtf.loc[genes_no_name.values,'gene_name'] = gtf.loc[genes_no_name.values,'gene_name']
@@ -174,8 +177,8 @@ def molecule_info_chunk(gtf, output_dir, chunk=None, gtf_dict_stepsize=10000):
     chroms = gtf.groupby('gene_name').chrom.apply(lambda s:list(s)[0])
     strands = gtf.groupby('gene_name').strand.apply(lambda s:list(s)[0])
 
-    # Create a dictionary to quickly check genes within +/- one gtf_dict_stepsize for each aligned read
-    gtf_dict_stepsize = 5000
+    # Create a dictionary for each "bin" of the genome, that maps to a list of genes within or overlapping
+    # that bin. The bin size is determined by gtf_dict_stepsize.
     starts_rounded = gene_starts.apply(lambda s:floor(s/gtf_dict_stepsize)*gtf_dict_stepsize).values
     ends_rounded = gene_ends.apply(lambda s:ceil(s/gtf_dict_stepsize)*gtf_dict_stepsize).values
     gene_ids = gene_starts.index
@@ -197,14 +200,30 @@ def molecule_info_chunk(gtf, output_dir, chunk=None, gtf_dict_stepsize=10000):
     samfile.close()
 
     def get_gene(read):
-        """ Returns a list of genes that read alignment maps to."""
+        """ Returns a list of genes that read alignment maps to.
+        The current implementation is stranded and will not return a gene on the opposite
+        strand.
+        Input: a read object from pysam Alignment file
+        Output: a list of genes (or an empty list if read doesn't map to any gene)
+
+        """
         if read.is_reverse:
             strand = '-'
         else:
             strand = '+'
+
+        # Assign each read into a "bin" by rounding the position (<chrom>:<pos>:<strand>) to the nearest
+        # gtf_dict_stepsize (default of 10kb).
         read_pos = chrom_dict[read.tid]+':'+str(int(floor(read.positions[0]/gtf_dict_stepsize)*gtf_dict_stepsize))+':'+strand
+
+        # The gene_dict contains all genes that overlap a given "bin". This does not guarantee that the read actually overlaps
+        # these genes, but reduces the list of possible genes to a few from >20k.
         potential_genes = gene_dict[read_pos]
         
+        
+        # Now we explicity check to see if the read maps to gene(s) from potential_genes.
+        # The current implementation is strict such the full read must be contained in the gene and 
+        # no part of the read can occur outside the gene.
         matching_genes = []
         for g in potential_genes:
             gene_start,gene_end = start_dict[g],end_dict[g]
@@ -214,7 +233,6 @@ def molecule_info_chunk(gtf, output_dir, chunk=None, gtf_dict_stepsize=10000):
 
     # Collapse similar UMIs for the same gene-cell_barcode combination. Write output info for
     # each UMI (cell_barcode, gene, UMI, count) to a file (read_assignment.csv).
-
     with open(output_filename,'w') as f:
         f.write('cell_barcode,gene,umi,counts\n')
 
@@ -239,10 +257,15 @@ def molecule_info_chunk(gtf, output_dir, chunk=None, gtf_dict_stepsize=10000):
                 umis.append(read.qname[25:35])
                 umi_quals.append(read.qname[36:46])
 
+                # Only want to collapse UMIs and write reads to file once, the 
+                # all the reads from a cell have been loaded. As soon as we see 
+                # a read from a different cell than the previous read, we process
+                # all the reads from the first cell.
                 if c>1:
                     if (cell_barcodes[-1]!=cell_barcodes[-2]):
                         next_cell=True
 
+                # Process reads from one cell: collapse UMIs and write to file
                 if next_cell:
                     df = pd.DataFrame({'cell_barcodes':pd.Series(cell_barcodes[:-1]),
                                        'umi':umis[:-1],
@@ -256,12 +279,12 @@ def molecule_info_chunk(gtf, output_dir, chunk=None, gtf_dict_stepsize=10000):
                                                                    header=False,
                                                                    index=False,
                                                                    mode='a')
-                    species = df.groupby(['umi']).gene.apply(lambda s:list(s)[0][:5])
-                    species_counts[cell_barcodes[0]] = species.groupby(species).size()
-                    cell_barcodes = []
-                    genes = []
-                    umis = []
-                    umi_quals = []
+
+                    # Reset lists, but keep the first read from the new cell
+                    cell_barcodes = cell_barcodes[-1:]
+                    genes = genes[-1:]
+                    umis = umis[-1:]
+                    umi_quals = umi_quals[-1:]
                     c = 0
                     next_cell=False
 
@@ -270,7 +293,6 @@ def molecule_info_chunk(gtf, output_dir, chunk=None, gtf_dict_stepsize=10000):
         if d%100000==0:
             print('Processed %d aligned reads...' %d)
             sys.stdout.flush()
-            #pass
     samfile.close()
 
 def join_read_assignment_files(output_dir, nthreads):
