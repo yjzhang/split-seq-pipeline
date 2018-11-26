@@ -18,6 +18,8 @@
 
 import argparse
 import tools
+import process
+import datetime
 
 parser = argparse.ArgumentParser()
 
@@ -30,8 +32,12 @@ parser.add_argument('mode', help="""Mode: one of "all", "preproc", "star", or "p
 parser.add_argument('fq1', help='fastq1 - mRNA reads')
 parser.add_argument('fq2', help='fastq2 - reads contain UMI and barcodes')
 parser.add_argument('output_dir', help='output dir')
+parser.add_argument('--chemistry', default='v1', help='Using v1 or v2 chemistry')
 parser.add_argument('--picard_dir', default='./', help='path containing picard.jar')
 parser.add_argument('--genome_dir', default='./', help='path containing reference genome')
+parser.add_argument('--star_path', default='./', help='path containing STAR')
+parser.add_argument('--gtf_file', default='./', help='GTF file with gene annotations')
+parser.add_argument('--nthreads', default='4', help='number of threads to use')
 
 args = parser.parse_args()
 
@@ -40,13 +46,33 @@ print(args.mode)
 print(args.fq1)
 print(args.fq2)
 print(args.output_dir)
+print(args.chemistry)
+print(args.genome_dir)
 
 mode = args.mode.lower()
 if mode == 'all':
-    pass
+    # Add barcode and UMI to header of read1 fastq
+    print(datetime.datetime.now(),'Correcting barcodes...')
+    tools.preprocess_fastq(args.fq1, args.fq2, args.output_dir, args.chemistry)
+
+    # Align with STAR
+    tools.run_star(args.genome_dir, args.output_dir, args.nthreads)
+
+    print(datetime.datetime.now(),'Sorting aligned bamfile...')
+    # Sort the output samfile
+    tools.sort_sam(args.output_dir, args.nthreads)
+
+    print(datetime.datetime.now(),'Getting molecular info...')
+    # Get molecular information for each UMI
+    process.molecule_info(args.gtf_file, args.output_dir, args.nthreads)
+
+    print(datetime.datetime.now(),'Finished successfully')
+
 if mode == 'preproc' or mode == 'preprocess' or mode == 'preprocessing':
-    pass
+    tools.preprocess_fastq(args.fq1, args.fq2, args.output_dir, args.chemistry)
 if mode == 'star':
-    pass
+    tools.run_star(args.genome_dir, args.output_dir)
 if mode == 'postproc' or mode == 'postprocess' or mode == 'postprocessing':
-    pass
+    tools.sort_sam(args.output_dir)
+if mode == 'molinfo':
+    process.molecule_info(args.gtf_file, args.output_dir, args.nthreads)
