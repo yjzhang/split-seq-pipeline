@@ -19,6 +19,7 @@
 import argparse
 import tools
 import process
+import datetime
 
 parser = argparse.ArgumentParser()
 
@@ -51,16 +52,21 @@ print(args.genome_dir)
 mode = args.mode.lower()
 if mode == 'all':
     # Add barcode and UMI to header of read1 fastq
+    print(datetime.datetime.now(),'Correcting barcodes...')
     tools.preprocess_fastq(args.fq1, args.fq2, args.output_dir, args.chemistry)
 
     # Align with STAR
-    tools.run_star(args.genome_dir, args.output_dir)
+    tools.run_star(args.genome_dir, args.output_dir, args.nthreads)
 
+    print(datetime.datetime.now(),'Sorting aligned bamfile...')
     # Sort the output samfile
-    tools.sort_sam(args.output_dir)
+    tools.sort_sam(args.output_dir, args.nthreads)
 
+    print(datetime.datetime.now(),'Getting molecular info...')
     # Get molecular information for each UMI
-    process.molecule_info(args.gtf_file, args.output_dir)
+    process.molecule_info(args.gtf_file, args.output_dir, args.nthreads)
+
+    print(datetime.datetime.now(),'Finished successfully')
 
 if mode == 'preproc' or mode == 'preprocess' or mode == 'preprocessing':
     tools.preprocess_fastq(args.fq1, args.fq2, args.output_dir, args.chemistry)
@@ -69,4 +75,4 @@ if mode == 'star':
 if mode == 'postproc' or mode == 'postprocess' or mode == 'postprocessing':
     tools.sort_sam(args.output_dir)
 if mode == 'molinfo':
-    process.molecule_info(args.gtf_file, args.output_dir, int(args.nthreads))
+    process.molecule_info(args.gtf_file, args.output_dir, args.nthreads)

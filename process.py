@@ -276,19 +276,24 @@ def molecule_info_chunk(gtf, output_dir, chunk=None, gtf_dict_stepsize=10000):
 def join_read_assignment_files(output_dir, nthreads):
     filenames = [output_dir + 'read_assignment.chunk%d.csv' %i for i in range(1,nthreads+1)]
     with open(output_dir + '/read_assignment.csv', 'w') as outfile:
+        # Write header
+        outfile.write('cell_barcode,gene,umi,counts\n')
         for fname in filenames:
             with open(fname) as infile:
+                # Don't copy header line from each file:
+                infile.readline()
                 for line in infile:
                     outfile.write(line)
 
 def molecule_info(gtf_file, output_dir, nthreads):
     """ Gets molecular info for a bam file. Splits the bamfile into 
     nthread chunks and runs in parallel """
+    nthreads = int(nthreads)
 
-    split_bam(output_dir, int(nthreads))
+    split_bam(output_dir, nthreads)
 
     Pros = []
-    for i in range(1,int(nthreads)+1):
+    for i in range(1,nthreads+1):
         print('Starting thread %d' %i)
         p = Process(target=molecule_info_chunk, args=(gtf_file, output_dir, i))
         Pros.append(p)
@@ -297,6 +302,11 @@ def molecule_info(gtf_file, output_dir, nthreads):
         t.join()
 
     join_read_assignment_files(output_dir, nthreads)
+
+    # Remove temporary split files:
+    for i in range(1,int(nthreads)+1):
+        os.remove(output_dir + '/read_assignment.chunk%d.csv' %i)
+        os.remove(output_dir + '/single_cells_barcoded_headAligned.sorted.chunk%d.bam' %i)
 
     # Log the total reads mapped to transcriptome and total UMIs
     total_read_count = 0

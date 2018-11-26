@@ -195,10 +195,12 @@ def preprocess_fastq(fastq1, fastq2, output_dir, chemistry='v1', **params):
 
     return 0
 
-def run_star(genome_dir, output_dir):
+def run_star(genome_dir, output_dir, nthreads):
+    """ Align reads using STAR.
     """
-    """
-    rc = subprocess.call("""STAR --genomeDir {0}/ --runThreadN 8 --readFilesIn {1}/single_cells_barcoded_head.fastq --outFileNamePrefix {1}/single_cells_barcoded_head""".format(genome_dir, output_dir), shell=True)
+
+    nthreads = int(nthreads)
+    rc = subprocess.call("""STAR --genomeDir {0}/ --runThreadN {2} --readFilesIn {1}/single_cells_barcoded_head.fastq --outFileNamePrefix {1}/single_cells_barcoded_head""".format(genome_dir, output_dir, nthreads), shell=True)
     
     # Add alignment stats to pipeline_stats
     with open(output_dir + '/single_cells_barcoded_headLog.final.out') as f:
@@ -214,8 +216,10 @@ def run_star(genome_dir, output_dir):
 
     return rc
 
-def sort_sam(output_dir):
-    rc = subprocess.call("""samtools sort -n -T {0}/single_cells_barcoded_headAligned.sort -o {0}/single_cells_barcoded_headAligned.sorted.bam {0}/single_cells_barcoded_headAligned.out.sam""".format(output_dir), shell=True)
+def sort_sam(output_dir, nthreads):
+    """ Sort samfile by header (cell_barcodes, umi) """
+    nthreads = int(nthreads)
+    rc = subprocess.call("""samtools sort -n -@ {1} -T {0}/single_cells_barcoded_headAligned.sort -o {0}/single_cells_barcoded_headAligned.sorted.bam {0}/single_cells_barcoded_headAligned.out.sam""".format(output_dir, nthreads), shell=True)
     return rc
 
 def run_postprocessing(input_dir, output_dir):
