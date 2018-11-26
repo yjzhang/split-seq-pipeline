@@ -9,7 +9,8 @@ from multiprocessing import Process
 import pandas as pd
 from collections import defaultdict
 import gzip
-from pylab import *
+#from pylab import *
+import numpy as np
 
 
 #import HTSeq
@@ -112,7 +113,7 @@ def split_bam(output_dir, nthreads):
         aligned_reads += int(f.readline()[:-1].split('\t')[1])
 
     # Number of reads per file. Round up to ensure we don't write (nthreads +1) files.
-    reads_per_chunk = int(ceil(aligned_reads/nthreads))
+    reads_per_chunk = int(np.ceil(aligned_reads/nthreads))
 
     c = 0
     prev_cell_barcode = ''
@@ -125,7 +126,7 @@ def split_bam(output_dir, nthreads):
             # Only write reads once all reads for a cell have been loaded to avoid
             # splitting one transcriptome into multiple files:
             if cell_barcode!=prev_cell_barcode:
-                chunk = int(floor(c/reads_per_chunk))
+                chunk = int(np.floor(c/reads_per_chunk))
                 for r in reads[:-1]:
                     samfile_chunks[chunk].write(r)
                 reads = reads[-1:]
@@ -179,8 +180,8 @@ def molecule_info_chunk(gtf, output_dir, chunk=None, gtf_dict_stepsize=10000):
 
     # Create a dictionary for each "bin" of the genome, that maps to a list of genes within or overlapping
     # that bin. The bin size is determined by gtf_dict_stepsize.
-    starts_rounded = gene_starts.apply(lambda s:floor(s/gtf_dict_stepsize)*gtf_dict_stepsize).values
-    ends_rounded = gene_ends.apply(lambda s:ceil(s/gtf_dict_stepsize)*gtf_dict_stepsize).values
+    starts_rounded = gene_starts.apply(lambda s:np.floor(s/gtf_dict_stepsize)*gtf_dict_stepsize).values
+    ends_rounded = gene_ends.apply(lambda s:np.ceil(s/gtf_dict_stepsize)*gtf_dict_stepsize).values
     gene_ids = gene_starts.index
     start_dict = gene_starts.to_dict()
     end_dict = gene_ends.to_dict()
@@ -214,7 +215,7 @@ def molecule_info_chunk(gtf, output_dir, chunk=None, gtf_dict_stepsize=10000):
 
         # Assign each read into a "bin" by rounding the position (<chrom>:<pos>:<strand>) to the nearest
         # gtf_dict_stepsize (default of 10kb).
-        read_pos = chrom_dict[read.tid]+':'+str(int(floor(read.positions[0]/gtf_dict_stepsize)*gtf_dict_stepsize))+':'+strand
+        read_pos = chrom_dict[read.tid]+':'+str(int(np.floor(read.positions[0]/gtf_dict_stepsize)*gtf_dict_stepsize))+':'+strand
 
         # The gene_dict contains all genes that overlap a given "bin". This does not guarantee that the read actually overlaps
         # these genes, but reduces the list of possible genes to a few from >20k.
