@@ -15,5 +15,6 @@ To install the package: run `pip install -e .` (might need sudo).
 
 ## Running the pipeline
 
+To see all options, run `split-seq -h`.
 
 ## References
