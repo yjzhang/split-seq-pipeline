@@ -1,8 +1,6 @@
 # Converting bam to read information
 # Cell barcode, UMI, gene alignment, and counts
 import os
-import shlex
-import subprocess
 import sys
 from multiprocessing import Process
 
@@ -16,7 +14,6 @@ import numpy as np
 #import HTSeq
 import pysam
 
-#PATH = './'
 PATH = os.path.dirname(__file__)
 
 bases = list('ACGT')
