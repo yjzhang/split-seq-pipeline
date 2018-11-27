@@ -1,0 +1,9 @@
+README.md
+split-seq
+split_seq/process.py
+split_seq/tools.py
+split_seq.egg-info/PKG-INFO
+split_seq.egg-info/SOURCES.txt
+split_seq.egg-info/dependency_links.txt
+split_seq.egg-info/requires.txt
+split_seq.egg-info/top_level.txt

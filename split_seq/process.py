@@ -257,6 +257,7 @@ def molecule_info_chunk(gtf, output_dir, chunk=None, gtf_dict_stepsize=10000):
                 cell_barcodes.append(read.qname[:24])
                 umis.append(read.qname[25:35])
                 umi_quals.append(read.qname[36:46])
+		c+=1
 
                 # Only want to collapse UMIs and write reads to file once, the 
                 # all the reads from a cell have been loaded. As soon as we see 
@@ -286,10 +287,9 @@ def molecule_info_chunk(gtf, output_dir, chunk=None, gtf_dict_stepsize=10000):
                     genes = genes[-1:]
                     umis = umis[-1:]
                     umi_quals = umi_quals[-1:]
-                    c = 0
+                    c = 1
                     next_cell=False
 
-                c += 1
         d += 1
         if d%100000==0:
             print('Processed %d aligned reads...' %d)
