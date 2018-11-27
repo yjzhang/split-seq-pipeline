@@ -45,7 +45,7 @@ def preprocess_fastq(fastq1, fastq2, output_dir, chemistry='v1', **params):
     def convert_degen_seq_to_list(seq):
         """Uses recursion to convert a degenerate sequence to a list
         For example: AGGN -> [AGGA, AGGC, AGGG, AGGT]"""
-        
+
         seq_list = []
         N_pos = seq.find('N')
         if N_pos>=0:
@@ -59,49 +59,47 @@ def preprocess_fastq(fastq1, fastq2, output_dir, chemistry='v1', **params):
         """Returns the list of sequences with edit distance 1
         It returns a sequence with the same length. So a base insertion
         will result in the last base being truncated"""
-        
+
         seq_len = len(seq)
-        
+
         # Original sequence
         edit_seqs = [seq]
-        
+
         # Insertions
         for i in range(seq_len):
             for b in bases:
                 edit_seqs.append(seq[:i] +b + seq[i:-1])
-                
+
         # Deletions
         for i in range(seq_len):
             edit_seqs.append(seq[:i] + seq[i+1:]+'-')
-        
+
         # Nt changes
         for i in range(seq_len):
             for b in bases:
                 if b!=seq[i]:
                     edit_seqs.append(seq[:i]+b+seq[i+1:])
-        
+
         # 1nt shift forward
         edit_seqs.append('-'+seq[:-1])
-        
+
         # 1nt shift backward
         edit_seqs.append(seq[1:]+'-')
-        
+
         # Convert Ns to sequences
         output_edit_seqs = []
         for s in edit_seqs:
             output_edit_seqs += convert_degen_seq_to_list(s)
-        
+
         return output_edit_seqs
 
-    def bc_editd1_correction(barcodes,bc_pre='',bc_suf='', bc_start=None, bc_end=None):
+    def bc_editd1_correction(barcodes,bc_pre='',bc_suf=''):
         pre_len = len(bc_pre)
         bc_len = len(barcodes[0])
         suf_len = len(bc_suf)
         full_seq_len = pre_len + bc_len + suf_len
-        if bc_start is None:
-            bc_start = (pre_len-1)
-        if bc_end is None:
-            bc_end = pre_len + bc_len + 1
+        bc_start = (pre_len-1)
+        bc_end = full_seq_len - 1
 
         bc_dict = defaultdict(list)
         for bc in barcodes:
@@ -109,6 +107,15 @@ def preprocess_fastq(fastq1, fastq2, output_dir, chemistry='v1', **params):
             [bc_dict[s].append(bc) for s in seqs_d1]
         bc_map = pd.Series(bc_dict)
         bc_map = bc_map[bc_map.apply(len)==1].apply(lambda s:s[0]).to_dict()
+
+        # Some perfect matches to barcodes also have sequences 1 edit distance away.
+        # In this case we want to choose the perfect matches. So we need to add the
+        # perfect matches back into the dictionary, since the step above just removed 
+        # them, if there was another d1 sequences.
+        for bc in barcodes:
+            perfect_matches = convert_degen_seq_to_list(bc_pre + bc + bc_suf)
+            for pm in perfect_matches:
+                bc_map[pm[bc_start:bc_end]] = pm[bc_start+1:bc_start+1+bc_len]
         return bc_map
 
     def fix_bc(bc,bc_map):
@@ -140,7 +147,7 @@ def preprocess_fastq(fastq1, fastq2, output_dir, chemistry='v1', **params):
             break
         bc_starts.append(bc_loc + c)
         c = bc_starts[-1] + bc_len
-    
+
     # Generate bc_map dictionary for each cell barcode.
     bc3_pre = amp_seq[bc_starts[0]-2:bc_starts[0]]
     bc3_suf = amp_seq[bc_starts[0]+8:bc_starts[0]+10]
@@ -157,9 +164,7 @@ def preprocess_fastq(fastq1, fastq2, output_dir, chemistry='v1', **params):
     bc1_suf = 'N'
     bc1_map = bc_editd1_correction(bc_8nt_RT.values,
                                    bc_pre=bc1_pre,
-                                   bc_suf=bc1_suf,
-                                   bc_start=1,
-                                   bc_end=10)
+                                   bc_suf=bc1_suf)
 
     
     fastq_reads = 0
