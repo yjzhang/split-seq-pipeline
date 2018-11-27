@@ -247,7 +247,7 @@ def molecule_info_chunk(gtf, output_dir, chunk=None, gtf_dict_stepsize=10000):
     next_cell = False
     species_counts = {}
     for read in samfile:
-        if not read.is_secondary:
+        if (not read.is_secondary) and (read.mapping_quality==255):
             gene_match = get_gene(read)
 
             # TODO: what to do with reads assigned to overlapping genes?
