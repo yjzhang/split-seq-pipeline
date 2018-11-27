@@ -14,7 +14,6 @@ import numpy as np
 #import HTSeq
 import pysam
 
-#PATH = './'
 PATH = os.path.dirname(__file__)
 
 bases = list('ACGT')

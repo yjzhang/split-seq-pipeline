@@ -2,8 +2,10 @@
 
 # this tries to install all the necessary dependencies...
 # first argument is directory where stuff is to be installed
+DEFAULT_INSTALL_DIR=~/split_seq_reqs
 
-install_dir=$1
+# TODO: allow for user install dir as a custom arg
+install_dir=$DEFAULT_INSTALL_DIR
 cd $install_dir
 
 mkdir bin
@@ -14,6 +16,7 @@ mkdir bin
 #else
 #    export PATH=$1/bin:$PATH
 #    echo "\nexport PATH=$1/bin:$PATH" >> ~/.bashrc
+#    . ~/.bashrc
 #fi
 
 # install STAR
@@ -21,22 +24,26 @@ echo "Installing STAR..."
 # TODO: test if STAR already exists
 
 if [ -x "$(command -v STAR)" ]; then
+    echo "STAR is installed"
+else
     wget https://github.com/alexdobin/STAR/archive/2.6.1c.tar.gz
     tar -xzf 2.6.1c.tar.gz
     cd STAR-2.6.1c
     cd source
     make STAR
     cp STAR ../../bin
-    cd ..
+    cd $install_dir
     rm 2.6.1c.tar.gz
+    echo "STAR is installed"
 fi
-echo "STAR is installed"
 
 cd $install_dir
-j
+
 # install samtools
 
 if [ -x "$(command -v samtools)" ]; then
+    echo "samtools is installed"
+else
     wget https://github.com/samtools/samtools/releases/download/1.9/samtools-1.9.tar.bz2
     tar -xf samtools-1.9.tar.bz2
     cd samtools-1.9
@@ -44,8 +51,8 @@ if [ -x "$(command -v samtools)" ]; then
     make
     make install
     cp samtools ../bin
-    cd ..
+    cd $install_dir
     rm samtools-1.9.tar.bz2
+    echo "samtools is installed"
 fi
-echo "samtools is installed"
 

@@ -13,9 +13,17 @@ from numpy import unique
 #import pysam
 
 #PATH = './'
-#PATH = os.path.dirname(__file__)
+PATH = os.path.dirname(__file__)
 HOME = os.path.expanduser('~')
-PATH = os.path.join(HOME, 'split_seq_reqs', 'bin')
+
+STAR_PATH = os.path.join(HOME, 'split_seq_reqs', 'bin', 'STAR')
+if not os.path.exists(STAR_PATH):
+    STAR_PATH = 'STAR'
+
+SAMTOOLS_PATH = os.path.join(HOME, 'split_seq_reqs', 'bin', 'samtools')
+if not os.path.exists(SAMTOOLS_PATH):
+    SAMTOOLS_PATH = 'samtools'
+
 
 
 def download_genome(genome_dir, ref='hg19'):
@@ -195,7 +203,7 @@ def run_star(genome_dir, output_dir, nthreads):
     """
 
     nthreads = int(nthreads)
-    rc = subprocess.call(PATH + '/' + """STAR --genomeDir {0}/ --runThreadN {2} --readFilesIn {1}/single_cells_barcoded_head.fastq --outFileNamePrefix {1}/single_cells_barcoded_head""".format(genome_dir, output_dir, nthreads), shell=True)
+    rc = subprocess.call(STAR_PATH + """ --genomeDir {0}/ --runThreadN {2} --readFilesIn {1}/single_cells_barcoded_head.fastq --outFileNamePrefix {1}/single_cells_barcoded_head""".format(genome_dir, output_dir, nthreads), shell=True)
     
     # Add alignment stats to pipeline_stats
     with open(output_dir + '/single_cells_barcoded_headLog.final.out') as f:
@@ -214,5 +222,5 @@ def run_star(genome_dir, output_dir, nthreads):
 def sort_sam(output_dir, nthreads):
     """ Sort samfile by header (cell_barcodes, umi) """
     nthreads = int(nthreads)
-    rc = subprocess.call(PATH + '/' + """samtools sort -n -@ {1} -T {0}/single_cells_barcoded_headAligned.sort -o {0}/single_cells_barcoded_headAligned.sorted.bam {0}/single_cells_barcoded_headAligned.out.sam""".format(output_dir, nthreads), shell=True)
+    rc = subprocess.call(SAMTOOLS_PATH + """ sort -n -@ {1} -T {0}/single_cells_barcoded_headAligned.sort -o {0}/single_cells_barcoded_headAligned.sorted.bam {0}/single_cells_barcoded_headAligned.out.sam""".format(output_dir, nthreads), shell=True)
     return rc
