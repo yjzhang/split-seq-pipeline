@@ -2,16 +2,16 @@
 
 ## Requirements
 
-Requires python3.
+Requires python 3.
 
-Software needed:
+Additional software needed:
 
 - [STAR](https://github.com/alexdobin/STAR)
 - [samtools](https://github.com/samtools/samtools)
 
 To install all dependencies at once, try running `install_dependencies.sh`.
 
-To install the package: run `pip install .` (might need sudo).
+To install the package: run `pip install -e .` (might need sudo).
 
 ## Running the pipeline
 

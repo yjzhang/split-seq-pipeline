@@ -1,8 +1,6 @@
 # Converting bam to read information
 # Cell barcode, UMI, gene alignment, and counts
 import os
-import shlex
-import subprocess
 import sys
 from multiprocessing import Process
 

@@ -27,6 +27,8 @@ if [ -x "$(command -v STAR)" ]; then
     cd source
     make STAR
     cp STAR ../../bin
+    cd ..
+    rm 2.6.1c.tar.gz
 fi
 echo "STAR is installed"
 
@@ -42,7 +44,8 @@ if [ -x "$(command -v samtools)" ]; then
     make
     make install
     cp samtools ../bin
+    cd ..
+    rm samtools-1.9.tar.bz2
 fi
-
 echo "samtools is installed"
 

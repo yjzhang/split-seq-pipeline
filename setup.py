@@ -1,19 +1,22 @@
 from setuptools import setup, find_packages
-from setuptools.command.install import install
+from distutils.command.install import install
 import os
 
 HOME = os.path.expanduser('~')
 
-DEFAULT_INSTALL_DIR = os.path.join(HOME, 'split_seq')
+# this is where the dependent libraries will be installed.
+DEFAULT_INSTALL_DIR = os.path.join(HOME, 'split_seq_reqs')
 
 
 
-class CustomInstallCommand(install):
+class CustomInstall(install):
     """Customized setuptools install command - prints a friendly greeting."""
 
     def run(self):
+        import subprocess
+        subprocess.call('sh install_dependencies.sh {0}'.format(DEFAULT_INSTALL_DIR), shell=True)
         print('test')
-        install.run(self)
+        super.run()
 
 setup(
     name='split_seq',
@@ -28,4 +31,5 @@ setup(
         'numpy',
         'pysam',
     ],
+    cmdclass={'install': CustomInstall},
 )
