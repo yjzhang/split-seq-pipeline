@@ -31,6 +31,98 @@ def download_genome(genome_dir, ref='hg19'):
     Downloads the hg19 reference genome...
     """
     # TODO: find the hg19 genome???
+    
+def make_combined_genome(species, fasta_filenames, output_dir):
+    
+    # Create a combined fasta file with species names added to the start of each chromosome name
+    cur_fa = fasta_filenames[0]
+    cur_species = species[0]
+    if fasta_filenames[0].split('.')[-1]=='gz':
+        command = """gunzip -cd {0} | awk 'substr($0,1,1)==">"{print ">{1}_"substr($1,2,length($1)-1),$2,$3,$4}substr($0,1,1)!=">"{print $0}' > {2}/genome.fa""".format(cur_fa, cur_species, output_dir)
+    else:
+        command = """cat {0} | awk 'substr($0,1,1)==">"{print ">{1}_"substr($1,2,length($1)-1),$2,$3,$4}substr($0,1,1)!=">"{print $0}' > {2}/genome.fa""".format(cur_fa, cur_species, output_dir)
+    rc = subprocess.call(command, shell=True)
+    
+    for i in range(1,len(species)):
+        cur_fa = fasta_filenames[i]
+        cur_species = species[i]
+        if fasta_filenames[0].split('.')[-1]=='gz':
+            command = """gunzip -cd {0} | awk 'substr($0,1,1)==">"{print ">{1}_"substr($1,2,length($1)-1),$2,$3,$4}substr($0,1,1)!=">"{print $0}' >> {2}/genome.fa""".format(cur_fa, cur_species, output_dir)
+        else:
+            command = """cat {0} | awk 'substr($0,1,1)==">"{print ">{1}_"substr($1,2,length($1)-1),$2,$3,$4}substr($0,1,1)!=">"{print $0}' >> {2}/genome.fa""".format(cur_fa, cur_species, output_dir)
+        rc = subprocess.call(command, shell=True)
+        
+def split_attributes(s):
+    """ Returns a dictionary from string of attributes in a GTF/GFF file
+    """
+    att_list = s[:-1].split('; ')
+    att_keys = [a.split(' ')[0] for a in att_list]
+    att_values = [' '.join(a.split(' ')[1:]) for a in att_list]
+    return dict(zip(att_keys,att_values))
+        
+def make_gtf_annotations(species, gtf_filenames, output_dir):
+    
+    
+    # Load the GTFs
+    names = ['Chromosome',
+         'Source',
+         'Feature',
+         'Start',
+         'End',
+         'Score',
+         'Strand',
+         'Frame',
+         'Attributes']
+
+    gtfs = {}
+    for i in range(len(species)):
+        s = species[i]
+        filename = gtf_filenames[i]
+        gtfs[s] = pd.read_csv(filename,sep='\t',names=names,comment='#')
+    
+    # TODO: allow users to specify the gene biotypes that they want to keep
+    # For now we keep the following
+    gene_biotypes_to_keep = ['protein_coding',
+                             'lincRNA',
+                             'antisense',
+                             'IG_C_gene',
+                             'IG_C_pseudogene',
+                             'IG_D_gene',
+                             'IG_J_gene',
+                             'IG_J_pseudogene',
+                             'IG_V_gene',
+                             'IG_V_pseudogene',
+                             'TR_C_gene',
+                             'TR_D_gene',
+                             'TR_J_gene',
+                             'TR_J_pseudogene',
+                             'TR_V_gene',
+                             'TR_V_pseudogene']
+    
+    # Generate a combined GTF with only the gene annotations
+    gtf_gene_combined = gtfs[species[0]].query('Feature=="gene"')
+    gtf_gene_combined = gtf_gene_combined.loc[
+    gtf_gene_combined.loc[:,'Chromosome'] = species[0] + '_' + gtf_gene_combined.Chromosome.apply(lambda s:str(s))
+    for i in range(1,len(species)):
+        gtf_gene_combined_temp = gtfs[species[i]].query('Feature=="gene"')
+        gtf_gene_combined_temp.loc[:,'Chromosome'] = species[i] + '_' + gtf_gene_combined_temp.Chromosome.apply(lambda s:str(s))
+        gtf_gene_combined = pd.concat([gtf_gene_combined,gtf_gene_combined_temp])
+    gene_biotypes = gtf_gene_combined.apply(lambda s: split_attributes(s)['gene_biotype'].strip('"'))
+    gtf_gene_combined = gtf_gene_combined.iloc[where(gene_biotypes.isin(gene_biotypes_to_keep).values)]
+    gtf_gene_combined.index = range(len(gtf_gene_combined))
+    gtf_gene_combined.to_csv(output_dir + '/genes.gtf',sep='\t',index=False)
+    
+    # Generate a combined GTF with only the exon annotations
+    gtf_exon_combined = gtfs[species[0]].query('Feature=="exon"')
+    gtf_exon_combined.loc[:,'Chromosome'] = species[0] + '_' + gtf_exon_combined.Chromosome.apply(lambda s:str(s))
+    for i in range(1,len(species)):
+        gtf_exon_combined_temp = gtfs[species[i]].query('Feature=="exon"')
+        gtf_exon_combined_temp.loc[:,'Chromosome'] = species[i] + '_' + gtf_exon_combined_temp.Chromosome.apply(lambda s:str(s))
+        gtf_exon_combined = pd.concat([gtf_exon_combined,gtf_exon_combined_temp])
+    gene_biotypes = gtf_exon_combined.apply(lambda s: split_attributes(s)['gene_biotype'].strip('"'))
+    gtf_exon_combined = gtf_exon_combined.iloc[where(gene_biotypes.isin(gene_biotypes_to_keep).values)]
+    gtf_exon_combined.index = range(len(gtf_exon_combined))
+    gtf_exon_combined.to_csv(output_dir + '/exons.gtf',sep='\t',index=False)
 
 def preprocess_fastq(fastq1, fastq2, output_dir, chemistry='v1', **params):
     """
