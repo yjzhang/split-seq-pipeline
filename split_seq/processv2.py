@@ -9,6 +9,7 @@ from collections import defaultdict
 import gzip
 #from pylab import *
 import numpy as np
+import pickle
 
 
 #import HTSeq
@@ -135,7 +136,7 @@ def split_bam(output_dir, nthreads):
         samfile_chunks[i].close()
     samfile.close()
 
-def molecule_info_chunk(gtf, output_dir, chunk=None, gtf_dict_stepsize=10000):
+def molecule_info_chunk(transcriptome_dir, output_dir, chunk=None, gtf_dict_stepsize=10000):
     """ Gets the molecular info for each UMI in a bamfile.
     """
     bamfile = output_dir + '/single_cells_barcoded_headAligned.sorted.bam'
@@ -147,51 +148,15 @@ def molecule_info_chunk(gtf, output_dir, chunk=None, gtf_dict_stepsize=10000):
         bamfile = output_dir + '/single_cells_barcoded_headAligned.sorted.chunk%d.bam' %chunk
         output_filename = output_dir +'/read_assignment.chunk%d.csv' %chunk
 
-    # Load gtf
-    names = ['chrom',
-             'source',
-             'ann_type',
-             'start',
-             'end',
-             'score',
-             'strand',
-             'misc1',
-             'tags'
-            ]
-    gtf = pd.read_csv(gtf,
-                      names=names,
-                      sep='\t')
-    gtf['gene_id'] = gtf.tags.apply(lambda s:s.split('gene_id "')[-1].split('";')[0])
-    gtf['gene_biotype'] = gtf.tags.apply(lambda s:s.split('gene_biotype "')[-1].split('";')[0])
-    gtf['gene_name'] = gtf.tags.apply(lambda s:s.split('gene_name "')[-1].split('";')[0])
-    
-    # If gene has no name, use gene ID
-    genes_no_name = gtf['gene_name'].str.contains('gene_id')
-    gtf.loc[genes_no_name.values,'gene_name'] = gtf.loc[genes_no_name.values,'gene_name']
+    with open(transcriptome_dir +'/gene_info.pkl', 'rb') as f:
+        gene_info = pickle.load(f)
 
-    # Get locations of genes. We are using the longest possible span of different transcripts here
-    gene_starts = gtf.groupby('gene_name').start.apply(min)
-    gene_ends = gtf.groupby('gene_name').end.apply(max)
-    chroms = gtf.groupby('gene_name').chrom.apply(lambda s:list(s)[0])
-    strands = gtf.groupby('gene_name').strand.apply(lambda s:list(s)[0])
-
-    # Create a dictionary for each "bin" of the genome, that maps to a list of genes within or overlapping
-    # that bin. The bin size is determined by gtf_dict_stepsize.
-    starts_rounded = gene_starts.apply(lambda s:np.floor(s/gtf_dict_stepsize)*gtf_dict_stepsize).values
-    ends_rounded = gene_ends.apply(lambda s:np.ceil(s/gtf_dict_stepsize)*gtf_dict_stepsize).values
-    gene_ids = gene_starts.index
-    start_dict = gene_starts.to_dict()
-    end_dict = gene_ends.to_dict()
-    gene_dict = defaultdict(list)
-    for i in range(len(gene_starts)):
-        cur_chrom = chroms[i]
-        cur_strand = strands[i]
-        cur_start = int(starts_rounded[i])
-        cur_end = int(ends_rounded[i])
-        cur_gene_id = gene_ids[i]
-        for coord in range(cur_start,cur_end+1,gtf_dict_stepsize):
-            if not (cur_gene_id in gene_dict[cur_chrom + ':' +  str(coord)]):
-                gene_dict[cur_chrom + ':' +  str(coord)+':'+cur_strand].append(cur_gene_id)
+    gene_dict = gene_info['gene_bins']
+    exon_gene_start_end_dict = gene_info['genes_to_exons']
+    start_dict = gene_info['gene_starts']
+    end_dict = gene_info['gene_ends']
+    gene_id_to_name = gene_info['gene_id_to_name']
+    gene_id_to_genome = gene_info['gene_id_to_genome']
 
     samfile = pysam.Samfile(bamfile)
     chrom_dict = pd.DataFrame(samfile.header['SQ']).SN.to_dict()
@@ -228,11 +193,29 @@ def molecule_info_chunk(gtf, output_dir, chunk=None, gtf_dict_stepsize=10000):
             if (gene_start<=read.positions[0]) and (read.positions[-1]<=gene_end):
                 matching_genes.append(g)
         return matching_genes
+    
+    def check_exon_alignment(read,gene):
+        """ Returns the fraction of bases in a read that align to at least one exonic base
+        """
+        # TODO: Write a faster implementation
+        possible_exons = exon_gene_start_end_dict[gene]
+        k = len(possible_exons)
+
+        # pysam is zero based and gtf is one based
+        aligned_positions = np.array(read.positions)# + 1
+        align_array = np.zeros(len(aligned_positions),dtype=bool)
+        c = 0
+
+        for start,end in possible_exons.items():
+            #print(read.positions)
+            #print(start,end)
+            align_array = align_array | ((aligned_positions>=(start)) & (aligned_positions<=(end)))
+        return np.mean(align_array)
 
     # Collapse similar UMIs for the same gene-cell_barcode combination. Write output info for
     # each UMI (cell_barcode, gene, UMI, count) to a file (read_assignment.csv).
     with open(output_filename,'w') as f:
-        f.write('cell_barcode,gene,umi,counts\n')
+        f.write('cell_barcode,genome,gene,gene_name,umi,counts,exonic\n')
 
     samfile = pysam.Samfile(bamfile)
     c = 0
@@ -240,16 +223,17 @@ def molecule_info_chunk(gtf, output_dir, chunk=None, gtf_dict_stepsize=10000):
     genes = []
     umis = []
     umi_quals = []
+    exonic_assignments = []
     d = 0
     next_cell = False
     species_counts = {}
     for read in samfile:
         if (not read.is_secondary) and (read.mapping_quality==255):
             gene_match = get_gene(read)
+            gene_match_exonic_alignment = []
 
-            # TODO: what to do with reads assigned to overlapping genes?
-            # For now only use reads uniquely assigned to genes
             if len(gene_match)==1:
+                exonic_assignments.append(check_exon_alignment(read,gene_match[0])>0.5)
                 genes.append(gene_match[0])
                 cell_barcodes.append(read.qname[:24])
                 umis.append(read.qname[25:35])
@@ -266,15 +250,21 @@ def molecule_info_chunk(gtf, output_dir, chunk=None, gtf_dict_stepsize=10000):
 
                 # Process reads from one cell: collapse UMIs and write to file
                 if next_cell:
-                    df = pd.DataFrame({'cell_barcodes':pd.Series(cell_barcodes[:-1]),
+                    df = pd.DataFrame({'cell_barcodes':cell_barcodes[:-1],
                                        'umi':umis[:-1],
                                        'gene':pd.Series(genes[:-1]),
-                                       'umi_quality':pd.Series(umi_quals[:-1])})
+                                       'exonic':exonic_assignments[:-1],
+                                       'umi_quality':umi_quals[:-1]})
                     df_collapsed = collapse_umis_dataframe(df)
                     df_collapsed = df_collapsed.reset_index()
                     df_collapsed.columns = ['gene','umi','counts']
+                    exonic_fraction = df.groupby(['gene','umi']).exonic.mean()
+                    df_collapsed.loc[:,'exonic'] = exonic_fraction.loc[list(zip(df_collapsed.gene.values,
+                                                                             df_collapsed.umi.values))].values>0.5
                     df_collapsed['cell_barcode'] = cell_barcodes[0]
-                    df_collapsed[['cell_barcode','gene','umi','counts']].to_csv(output_filename,
+                    df_collapsed.loc[:,'gene_name'] = df.gene.apply(lambda s:gene_id_to_name[s])
+                    df_collapsed.loc[:,'genome'] = df.gene.apply(lambda s:gene_id_to_genome[s])
+                    df_collapsed[['cell_barcode','genome','gene','gene_name','umi','counts','exonic']].to_csv(output_filename,
                                                                    header=False,
                                                                    index=False,
                                                                    mode='a')
@@ -283,6 +273,7 @@ def molecule_info_chunk(gtf, output_dir, chunk=None, gtf_dict_stepsize=10000):
                     cell_barcodes = cell_barcodes[-1:]
                     genes = genes[-1:]
                     umis = umis[-1:]
+                    exonic_assignments = exonic_assignments[-1:]
                     umi_quals = umi_quals[-1:]
                     c = 1
                     next_cell=False
@@ -297,7 +288,7 @@ def join_read_assignment_files(output_dir, nthreads):
     filenames = [output_dir + 'read_assignment.chunk%d.csv' %i for i in range(1,nthreads+1)]
     with open(output_dir + '/read_assignment.csv', 'w') as outfile:
         # Write header
-        outfile.write('cell_barcode,gene,umi,counts\n')
+        outfile.write('cell_barcode,genome,gene,gene_name,umi,counts,exonic\n')
         for fname in filenames:
             with open(fname) as infile:
                 # Don't copy header line from each file:
@@ -305,7 +296,7 @@ def join_read_assignment_files(output_dir, nthreads):
                 for line in infile:
                     outfile.write(line)
 
-def molecule_info(gtf_file, output_dir, nthreads):
+def molecule_info(transcritome_dir, output_dir, nthreads):
     """ Gets molecular info for a bam file. Splits the bamfile into 
     nthread chunks and runs in parallel """
     nthreads = int(nthreads)
@@ -315,7 +306,7 @@ def molecule_info(gtf_file, output_dir, nthreads):
     Pros = []
     for i in range(1,nthreads+1):
         print('Starting thread %d' %i)
-        p = Process(target=molecule_info_chunk, args=(gtf_file, output_dir, i))
+        p = Process(target=molecule_info_chunk, args=(transcritome_dir, output_dir, i))
         Pros.append(p)
         p.start()
     for t in Pros:
@@ -333,7 +324,7 @@ def molecule_info(gtf_file, output_dir, nthreads):
     with open(output_dir +'/read_assignment.csv') as f:
         for i, l in enumerate(f):
             if i>0:
-                total_read_count += int(l.split(',')[-1][:-1])
+                total_read_count += int(l.split(',')[-2])
     with open(output_dir + '/pipeline_stats.txt', 'a') as f:
         f.write('mapped_to_transcriptome\t%d\n' %total_read_count)
         f.write('total_umis\t%d\n' %i)
