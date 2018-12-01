@@ -35,24 +35,26 @@ def download_genome(genome_dir, ref='hg19'):
     # TODO: find the hg19 genome???
     
 def make_combined_genome(species, fasta_filenames, output_dir):
-    species = [s[0] for s in species]
-    fasta_filenames = [s[0] for s in species]
+    
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+    
     # Create a combined fasta file with species names added to the start of each chromosome name
     cur_fa = fasta_filenames[0]
     cur_species = species[0]
     if fasta_filenames[0].split('.')[-1]=='gz':
-        command = """gunzip -cd {0} | awk 'substr($0,1,1)==">"{print ">{1}_"substr($1,2,length($1)-1),$2,$3,$4}substr($0,1,1)!=">"{print $0}' > {2}/genome.fa""".format(cur_fa, cur_species, output_dir)
+        command = """gunzip -cd {0} | awk 'substr($0,1,1)==">"{{print ">{1}_"substr($1,2,length($1)-1),$2,$3,$4}}substr($0,1,1)!=">"{{print $0}}' > {2}/genome.fa""".format(cur_fa, cur_species, output_dir)
     else:
-        command = """cat {0} | awk 'substr($0,1,1)==">"{print ">{1}_"substr($1,2,length($1)-1),$2,$3,$4}substr($0,1,1)!=">"{print $0}' > {2}/genome.fa""".format(cur_fa, cur_species, output_dir)
+        command = """cat {0} | awk 'substr($0,1,1)==">"{{print ">{1}_"substr($1,2,length($1)-1),$2,$3,$4}}substr($0,1,1)!=">"{{print $0}}' > {2}/genome.fa""".format(cur_fa, cur_species, output_dir)
     rc = subprocess.call(command, shell=True)
     
     for i in range(1,len(species)):
         cur_fa = fasta_filenames[i]
         cur_species = species[i]
         if fasta_filenames[0].split('.')[-1]=='gz':
-            command = """gunzip -cd {0} | awk 'substr($0,1,1)==">"{print ">{1}_"substr($1,2,length($1)-1),$2,$3,$4}substr($0,1,1)!=">"{print $0}' >> {2}/genome.fa""".format(cur_fa, cur_species, output_dir)
+            command = """gunzip -cd {0} | awk 'substr($0,1,1)==">"{{print ">{1}_"substr($1,2,length($1)-1),$2,$3,$4}}substr($0,1,1)!=">"{{print $0}}' >> {2}/genome.fa""".format(cur_fa, cur_species, output_dir)
         else:
-            command = """cat {0} | awk 'substr($0,1,1)==">"{print ">{1}_"substr($1,2,length($1)-1),$2,$3,$4}substr($0,1,1)!=">"{print $0}' >> {2}/genome.fa""".format(cur_fa, cur_species, output_dir)
+            command = """cat {0} | awk 'substr($0,1,1)==">"{{print ">{1}_"substr($1,2,length($1)-1),$2,$3,$4}}substr($0,1,1)!=">"{{print $0}}' >> {2}/genome.fa""".format(cur_fa, cur_species, output_dir)
         rc = subprocess.call(command, shell=True)
         
 def split_attributes(s):
@@ -189,8 +191,8 @@ def make_gtf_annotations(species, gtf_filenames, output_dir):
         pickle.dump(gene_info, f, pickle.HIGHEST_PROTOCOL)
         
 def generate_STAR_index(output_dir, nthreads):
-    star_command = """STAR  --runMode genomeGenerate --genomeDir {1} --genomeFastaFiles {1}/genome.fa --runThreadN {2}""".format(output_dir, nthreads)
-    rc = subprocess.call(command, shell=True)
+    star_command = """STAR  --runMode genomeGenerate --genomeDir {0} --genomeFastaFiles {0}/genome.fa --sjdbGTFfile {0}/exons.gtf --runThreadN {1}""".format(output_dir, nthreads)
+    rc = subprocess.call(star_command, shell=True)
     return rc
                         
 def preprocess_fastq(fastq1, fastq2, output_dir, chemistry='v1', **params):
