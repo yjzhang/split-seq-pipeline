@@ -7,6 +7,8 @@ import pandas as pd
 from collections import defaultdict
 import gzip
 from numpy import unique
+import numpy as np
+import pickle
 
 
 #import HTSeq
@@ -33,7 +35,8 @@ def download_genome(genome_dir, ref='hg19'):
     # TODO: find the hg19 genome???
     
 def make_combined_genome(species, fasta_filenames, output_dir):
-    
+    species = [s[0] for s in species]
+    fasta_filenames = [s[0] for s in species]
     # Create a combined fasta file with species names added to the start of each chromosome name
     cur_fa = fasta_filenames[0]
     cur_species = species[0]
@@ -59,9 +62,16 @@ def split_attributes(s):
     att_keys = [a.split(' ')[0] for a in att_list]
     att_values = [' '.join(a.split(' ')[1:]) for a in att_list]
     return dict(zip(att_keys,att_values))
+
+def get_attribute(s,att):
+    att_value = ''
+    try:
+        att_value = split_attributes(s)[att].strip('"')
+    except:
+        att_value = ''
+    return att_value
         
 def make_gtf_annotations(species, gtf_filenames, output_dir):
-    
     
     # Load the GTFs
     names = ['Chromosome',
@@ -78,7 +88,7 @@ def make_gtf_annotations(species, gtf_filenames, output_dir):
     for i in range(len(species)):
         s = species[i]
         filename = gtf_filenames[i]
-        gtfs[s] = pd.read_csv(filename,sep='\t',names=names,comment='#')
+        gtfs[s] = pd.read_csv(filename,sep='\t',names=names,comment='#',engine='python')
     
     # TODO: allow users to specify the gene biotypes that they want to keep
     # For now we keep the following
@@ -101,14 +111,13 @@ def make_gtf_annotations(species, gtf_filenames, output_dir):
     
     # Generate a combined GTF with only the gene annotations
     gtf_gene_combined = gtfs[species[0]].query('Feature=="gene"')
-    gtf_gene_combined = gtf_gene_combined.loc[
     gtf_gene_combined.loc[:,'Chromosome'] = species[0] + '_' + gtf_gene_combined.Chromosome.apply(lambda s:str(s))
     for i in range(1,len(species)):
         gtf_gene_combined_temp = gtfs[species[i]].query('Feature=="gene"')
         gtf_gene_combined_temp.loc[:,'Chromosome'] = species[i] + '_' + gtf_gene_combined_temp.Chromosome.apply(lambda s:str(s))
         gtf_gene_combined = pd.concat([gtf_gene_combined,gtf_gene_combined_temp])
-    gene_biotypes = gtf_gene_combined.apply(lambda s: split_attributes(s)['gene_biotype'].strip('"'))
-    gtf_gene_combined = gtf_gene_combined.iloc[where(gene_biotypes.isin(gene_biotypes_to_keep).values)]
+    gene_biotypes = gtf_gene_combined.Attributes.apply(lambda s: get_attribute(s,'gene_biotype'))
+    gtf_gene_combined = gtf_gene_combined.iloc[np.where(gene_biotypes.isin(gene_biotypes_to_keep).values)]
     gtf_gene_combined.index = range(len(gtf_gene_combined))
     gtf_gene_combined.to_csv(output_dir + '/genes.gtf',sep='\t',index=False)
     
@@ -119,11 +128,71 @@ def make_gtf_annotations(species, gtf_filenames, output_dir):
         gtf_exon_combined_temp = gtfs[species[i]].query('Feature=="exon"')
         gtf_exon_combined_temp.loc[:,'Chromosome'] = species[i] + '_' + gtf_exon_combined_temp.Chromosome.apply(lambda s:str(s))
         gtf_exon_combined = pd.concat([gtf_exon_combined,gtf_exon_combined_temp])
-    gene_biotypes = gtf_exon_combined.apply(lambda s: split_attributes(s)['gene_biotype'].strip('"'))
-    gtf_exon_combined = gtf_exon_combined.iloc[where(gene_biotypes.isin(gene_biotypes_to_keep).values)]
+    gene_biotypes = gtf_exon_combined.Attributes.apply(lambda s: get_attribute(s,'gene_biotype'))
+    gtf_exon_combined = gtf_exon_combined.iloc[np.where(gene_biotypes.isin(gene_biotypes_to_keep).values)]
     gtf_exon_combined.index = range(len(gtf_exon_combined))
     gtf_exon_combined.to_csv(output_dir + '/exons.gtf',sep='\t',index=False)
-
+    
+    # Get locations of genes. We are using the longest possible span of different transcripts here
+    gtf_gene_combined.loc[:,'gene_id'] = gtf_gene_combined.Attributes.apply(lambda s: get_attribute(s,'gene_id'))
+    gene_starts = gtf_gene_combined.groupby('gene_id').Start.apply(min)
+    gene_ends = gtf_gene_combined.groupby('gene_id').End.apply(max)
+    chroms = gtf_gene_combined.groupby('gene_id').Chromosome.apply(lambda s:list(s)[0])
+    strands = gtf_gene_combined.groupby('gene_id').Strand.apply(lambda s:list(s)[0])
+    
+    gtf_dict_stepsize = 10000
+    # Create a dictionary for each "bin" of the genome, that maps to a list of genes within or overlapping
+    # that bin. The bin size is determined by gtf_dict_stepsize.
+    starts_rounded = gene_starts.apply(lambda s:np.floor(s/gtf_dict_stepsize)*gtf_dict_stepsize).values
+    ends_rounded = gene_ends.apply(lambda s:np.ceil(s/gtf_dict_stepsize)*gtf_dict_stepsize).values
+    gene_ids = gene_starts.index
+    start_dict = gene_starts.to_dict()
+    end_dict = gene_ends.to_dict()
+    gene_dict = defaultdict(list)
+    for i in range(len(gene_starts)):
+        cur_chrom = chroms[i]
+        cur_strand = strands[i]
+        cur_start = int(starts_rounded[i])
+        cur_end = int(ends_rounded[i])
+        cur_gene_id = gene_ids[i]
+        for coord in range(cur_start,cur_end+1,gtf_dict_stepsize):
+            if not (cur_gene_id in gene_dict[cur_chrom + ':' +  str(coord)]):
+                gene_dict[cur_chrom + ':' +  str(coord)+':'+cur_strand].append(cur_gene_id)
+                
+    # Create a dictionary from genes to exons
+    exon_gene_ids = gtf_exon_combined.Attributes.apply(lambda s: get_attribute(s,'gene_id')).values
+    exon_starts = gtf_exon_combined.Start.values
+    exon_ends = gtf_exon_combined.End.values
+    
+    exon_gene_start_end_dict = defaultdict(dict)
+    for i in range(len(exon_gene_ids)):
+        cur_gene_id = exon_gene_ids[i]
+        cur_exon_start = exon_starts[i]
+        cur_exon_ends = exon_ends[i]
+        exon_gene_start_end_dict[cur_gene_id][cur_exon_start] = cur_exon_ends
+        
+    gene_id_to_gene_names = dict(zip(gtf_gene_combined.Attributes.apply(lambda s: get_attribute(s,'gene_id')),
+                                     gtf_gene_combined.Attributes.apply(lambda s: get_attribute(s,'gene_name'))))
+    gene_id_to_genome = dict(zip(gtf_gene_combined.Attributes.apply(lambda s: get_attribute(s,'gene_id')),
+                                 gtf_gene_combined.Chromosome.apply(lambda s:s.split('_')[0])))
+    
+    #Save dictionary with gene info
+    gene_info = {'gene_bins':gene_dict,
+                 'genes_to_exons':exon_gene_start_end_dict,
+                 'gene_starts': start_dict,
+                 'gene_ends': end_dict,
+                 'gene_id_to_name': gene_id_to_gene_names,
+                 'gene_id_to_genome':gene_id_to_genome
+                }
+    
+    with open(output_dir+ '/gene_info.pkl', 'wb') as f:
+        pickle.dump(gene_info, f, pickle.HIGHEST_PROTOCOL)
+        
+def generate_STAR_index(output_dir, nthreads):
+    star_command = """STAR  --runMode genomeGenerate --genomeDir {1} --genomeFastaFiles {1}/genome.fa --runThreadN {2}""".format(output_dir, nthreads)
+    rc = subprocess.call(command, shell=True)
+    return rc
+                        
 def preprocess_fastq(fastq1, fastq2, output_dir, chemistry='v1', **params):
     """
     Performs all the steps before running the alignment. Temporary files

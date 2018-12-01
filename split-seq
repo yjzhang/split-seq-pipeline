@@ -17,7 +17,7 @@
 # 4. 
 
 import argparse
-from split_seq import tools, process
+from split_seq import tools, process, processv2
 import datetime
 
 parser = argparse.ArgumentParser()
@@ -28,14 +28,15 @@ parser.add_argument('mode', help="""Mode: one of "all", "preproc", "star", or "p
 "star" assumes that output of preproc exists in output_dir, and tries to run the STAR alignment, producing a file called single_cells_barcoded_headAligned.out.sam.
 "postproc" assumes that the output of star exists in  output_dir.
 """)
-parser.add_argument('fq1', help='fastq1 - mRNA reads')
-parser.add_argument('fq2', help='fastq2 - reads contain UMI and barcodes')
-parser.add_argument('output_dir', help='output dir')
+parser.add_argument('--fq1', help='fastq1 - mRNA reads')
+parser.add_argument('--fq2', help='fastq2 - reads contain UMI and barcodes')
+parser.add_argument('--output_dir', help='output dir')
 parser.add_argument('--chemistry', default='v1', help='Using v1 or v2 chemistry')
 parser.add_argument('--genome_dir', default='./', help='path containing reference genome')
 # TODO: this is currently unused
 #parser.add_argument('--star_path', default='./', help='path containing STAR')
-parser.add_argument('--genes', default='./', help='GTF file with gene annotations')
+parser.add_argument('--genome', nargs='*', help='name(s) of genome(s)/species')
+parser.add_argument('--genes', nargs='*', help='GTF file(s) with gene annotations')
 parser.add_argument('--nthreads', default='4', help='number of threads to use')
 
 args = parser.parse_args()
@@ -51,10 +52,10 @@ print(args.genome_dir)
 mode = args.mode.lower()
 if mode == 'mkref':
     # Generate genome
-    tools.make_combined_genome(args.genome, args.fasta, output_dir)
+    #tools.make_combined_genome(args.genome, args.fasta, args.output_dir)
     
     # Make a combine annotation from GTF
-    tools.make_gtf_annotations(args.genome, args.genes, output_dir)
+    tools.make_gtf_annotations(args.genome, args.genes, args.output_dir)
     
     # Index genome with star
     # STAR command
@@ -82,6 +83,7 @@ if mode == 'preproc' or mode == 'preprocess' or mode == 'preprocessing':
 if mode == 'star':
     tools.run_star(args.genome_dir, args.output_dir)
 if mode == 'postproc' or mode == 'postprocess' or mode == 'postprocessing':
-    tools.sort_sam(args.output_dir)
+    tools.sort_sam(args.output_dir, args.nthreads)
 if mode == 'molinfo':
-    process.molecule_info(args.gtf_file, args.output_dir, args.nthreads)
+    #process.molecule_info(args.gtf_file, args.output_dir, args.nthreads)
+    processv2.molecule_info(args.genome_dir, args.output_dir, args.nthreads)
