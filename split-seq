@@ -76,7 +76,7 @@ if mode == 'all':
 
     print(datetime.datetime.now(),'Getting molecular info...')
     # Get molecular information for each UMI
-    process.molecule_info(args.gtf_file, args.output_dir, args.nthreads)
+    processv2.molecule_info(args.genome_dir, args.output_dir, args.nthreads)
 
     print(datetime.datetime.now(),'Finished successfully')
 
