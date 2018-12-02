@@ -191,7 +191,7 @@ def make_gtf_annotations(species, gtf_filenames, output_dir):
         pickle.dump(gene_info, f, pickle.HIGHEST_PROTOCOL)
         
 def generate_STAR_index(output_dir, nthreads):
-    star_command = """STAR  --runMode genomeGenerate --genomeDir {0} --genomeFastaFiles {0}/genome.fa --sjdbGTFfile {0}/exons.gtf --runThreadN {1}""".format(output_dir, nthreads)
+    star_command = """STAR  --runMode genomeGenerate --genomeDir {0} --genomeFastaFiles {0}/genome.fa --sjdbGTFfile {0}/exons.gtf --runThreadN {1} --limitGenomeGenerateRAM 16000000000""".format(output_dir, nthreads)
     rc = subprocess.call(star_command, shell=True)
     return rc
                         
