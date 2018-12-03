@@ -352,6 +352,10 @@ def preprocess_fastq(fastq1, fastq2, output_dir, chemistry='v1', **params):
             qual1 = f1.readline().decode("utf-8")
             
             if len(cellbc_umi)==35:
+                TSO_location = seq1.find('AAGCAGTGGTATCAACGCAGAGTGAATGGG')
+                if TSO_location>=0:
+                    seq1 = seq1[TSO_location+30:]
+                    qual1 = seq1[TSO_location+30:]
                 header1 = '@' + bc3 + bc2 + bc1 +'_' + umi + '_' + qual2.decode("utf-8")[:10] + '_' + header1[1:]
                 fout.write(header1)
                 fout.write(seq1)
