@@ -302,7 +302,6 @@ def generate_dge_report(output_dir,genome_dir,chemistry):
         for i in range(1, len(subsample_depths)):
             subsample = subsample_depths[i]
             subsample_fraction = subsample/seq_depth
-            print(subsample, end=' ')
             sub_sampled_counts = np.random.binomial(species_df.counts.values,subsample_fraction)
             gene_counts_subsampled[subsample] = (species_df[sub_sampled_counts>0]
                                                         .groupby('cell_barcode')
@@ -340,10 +339,12 @@ def generate_dge_report(output_dir,genome_dir,chemistry):
         gene_counts_subsampled_df[s].plot(label=s,ax=ax)
     ax.legend()
     ax.set_title('Median Genes per Cell')
+    ax.set_xlabel('Sequencing Reads per Cell')
 
     ax = fig.add_axes([0.75,0.05,0.6,0.4])
     for s in species:
         umi_counts_subsampled_df[s].plot(label=s,ax=ax)
     ax.legend()
     ax.set_title('Median UMIs per Cell')
+    ax.set_xlabel('Sequencing Reads per Cell')
     fig.savefig(output_dir +'/analysis_summary.pdf',bbox_inches='tight')
