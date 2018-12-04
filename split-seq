@@ -17,7 +17,7 @@
 # 4. 
 
 import argparse
-from split_seq import tools, process, processv2
+from split_seq import tools, process, processv2, analysis
 import datetime
 
 parser = argparse.ArgumentParser()
@@ -76,7 +76,10 @@ if mode == 'all':
 
     print(datetime.datetime.now(),'Getting molecular info...')
     # Get molecular information for each UMI
-    process.molecule_info(args.gtf_file, args.output_dir, args.nthreads)
+    processv2.molecule_info(args.genome_dir, args.output_dir, args.nthreads)
+
+    print(datetime.datetime.now(),'Generating digital gene expression matrix...') 
+    analysis.generate_dge_report(args.output_dir,args.genome_dir,args.chemistry)
 
     print(datetime.datetime.now(),'Finished successfully')
 
@@ -89,3 +92,5 @@ if mode == 'postproc' or mode == 'postprocess' or mode == 'postprocessing':
 if mode == 'molinfo':
     #process.molecule_info(args.gtf_file, args.output_dir, args.nthreads)
     processv2.molecule_info(args.genome_dir, args.output_dir, args.nthreads)
+if mode=='dge':
+    analysis.generate_dge_report(args.output_dir,args.genome_dir,args.chemistry)

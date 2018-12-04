@@ -2,6 +2,7 @@ MANIFEST.in
 README.md
 split-seq
 split_seq/__init__.py
+split_seq/analysis.py
 split_seq/process.py
 split_seq/processv2.py
 split_seq/tools.py
