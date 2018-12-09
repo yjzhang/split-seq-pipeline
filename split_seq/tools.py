@@ -177,6 +177,10 @@ def make_gtf_annotations(species, gtf_filenames, output_dir):
                                      gtf_gene_combined.Attributes.apply(lambda s: get_attribute(s,'gene_name'))))
     gene_id_to_genome = dict(zip(gtf_gene_combined.Attributes.apply(lambda s: get_attribute(s,'gene_id')),
                                  gtf_gene_combined.Chromosome.apply(lambda s:s.split('_')[0])))
+    gene_id_to_strand = dict(zip(gtf_gene_combined.Attributes.apply(lambda s:get_attribute(s,'gene_id')).values,
+                                 gtf_gene_combined.Strand.values))
+    gene_id_to_chrom = dict(zip(gtf_gene_combined.Attributes.apply(lambda s:get_attribute(s,'gene_id')).values,
+                                 gtf_gene_combined.Chromosome.values))
     
     #Save dictionary with gene info
     gene_info = {'gene_bins':gene_dict,
@@ -184,7 +188,9 @@ def make_gtf_annotations(species, gtf_filenames, output_dir):
                  'gene_starts': start_dict,
                  'gene_ends': end_dict,
                  'gene_id_to_name': gene_id_to_gene_names,
-                 'gene_id_to_genome':gene_id_to_genome
+                 'gene_id_to_genome':gene_id_to_genome,
+                 'gene_id_to_chrom':gene_id_to_chrom,
+                 'gene_id_to_strand':gene_id_to_strand
                 }
     
     with open(output_dir+ '/gene_info.pkl', 'wb') as f:
