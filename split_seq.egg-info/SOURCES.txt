@@ -6,6 +6,7 @@ split_seq/analysis.py
 split_seq/process.py
 split_seq/processv2.py
 split_seq/tools.py
+split_seq/tools_debug.py
 split_seq.egg-info/PKG-INFO
 split_seq.egg-info/SOURCES.txt
 split_seq.egg-info/dependency_links.txt

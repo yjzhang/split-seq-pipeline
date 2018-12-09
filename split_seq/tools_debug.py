@@ -332,6 +332,7 @@ def preprocess_fastq(fastq1, fastq2, output_dir, chemistry='v1', **params):
     
     fastq_reads = 0
     fastq_valid_barcode_reads = 0
+    seqs_lst,bc1_lst,bc2_lst,bc3_lst = [],[],[],[]
     with gzip.open(fastq1,'rb') as f1, gzip.open(fastq2,'rb') as f2, open(output_dir + 'single_cells_barcoded_head.fastq','w') as fout:
         while True:
             header2 = f2.readline()
@@ -341,6 +342,10 @@ def preprocess_fastq(fastq1, fastq2, output_dir, chemistry='v1', **params):
             bc1 = fix_bc(seq2[bc_starts[2]-1:bc_starts[2]+bc_len],bc1_map)
             bc2 = fix_bc(seq2[bc_starts[1]-1:bc_starts[1]+bc_len+1],bc2_map)
             bc3 = fix_bc(seq2[bc_starts[0]-1:bc_starts[0]+bc_len+1],bc3_map)
+            seqs_lst.append(seq2[:-1])
+            bc1_lst.append(bc1)
+            bc2_lst.append(bc2)
+            bc3_lst.append(bc3)
             umi = seq2[:10]
             strand2 = f2.readline()
             qual2 = f2.readline()
@@ -363,6 +368,12 @@ def preprocess_fastq(fastq1, fastq2, output_dir, chemistry='v1', **params):
                 fout.write(qual1)
                 fastq_valid_barcode_reads += 1
             fastq_reads += 1
+    barcode_df = pd.DataFrame()
+    barcode_df['read2'] = seqs_lst
+    barcode_df['bc1'] = bc1_lst
+    barcode_df['bc2'] = bc2_lst
+    barcode_df['bc3'] = bc3_lst
+    barcode_df.to_csv(output_dir + '/barcode_df.csv')
 
     with open(output_dir + '/pipeline_stats.txt', 'w') as f:
         f.write('fastq_reads\t%d\n' %fastq_reads)
