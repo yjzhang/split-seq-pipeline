@@ -139,8 +139,51 @@ def plot_read_thresh(read_counts,fig=None,ax=None):
         return read_threshold
     else:
         return fig,ax,read_threshold
+def parse_wells(s):
+    wells = np.arange(48,dtype=int).reshape(4,12)
+    try:
+        blocks = s.split(',')
+        row_letter_to_number = {'A':0,'B':1,'C':2,'D':3}
+        sub_wells = []
+        for b in blocks:
+            if ':' in b:
+                start,end = b.split(':')
+                s_row = row_letter_to_number[start[:1]]
+                s_col = int(start[1:])-1
+                e_row = row_letter_to_number[end[:1]]
+                e_col = int(end[1:])
+                sub_wells += list(wells[s_row:e_row+1,s_col:e_col].flatten())
+            elif '-' in b:
+                start,end = b.split('-')
+                s_row = row_letter_to_number[start[:1]]
+                s_col = int(start[1:])-1
+                e_row = row_letter_to_number[end[:1]]
+                e_col = int(end[1:])-1
+                sub_wells += list(np.arange(wells[s_row,s_col],wells[e_row,e_col]+1))
+        sub_wells = np.unique(sub_wells)
+    except:
+        sub_wells = 'Failed'
+    return sub_wells
 
-def generate_dge_report(output_dir,genome_dir,chemistry):
+def check_valid_samples(samples):
+    if len(samples)>0:
+        for i in range(len(samples)):
+            sample_name = samples[i][0]
+            sub_wells = parse_wells(samples[i][1])
+            if str(sub_wells) == 'Failed':
+                return False
+    return True
+ 
+def generate_all_dge_reports(output_dir, genome_dir, chemistry, samples):
+    if len(samples)>0:
+        for i in range(len(samples)):
+            sample_name = samples[i][0]
+            sub_wells = parse_wells(samples[i][1])
+            generate_single_dge_report(output_dir,genome_dir,chemistry,sample_name=sample_name,sub_wells=sub_wells)
+    else:
+        generate_single_dge_report(output_dir,genome_dir,chemistry)
+
+def generate_single_dge_report(output_dir,genome_dir,chemistry,sample_name='',sub_wells=None):
 
     with open(genome_dir +'/gene_info.pkl', 'rb') as f:
         gene_info = pickle.load(f)
@@ -159,8 +202,13 @@ def generate_dge_report(output_dir,genome_dir,chemistry):
     bc_8nt_randhex_dt_dict = dict(zip(bc_8nt.values,['dt']*48+['randhex']*48))
 
     df = pd.read_csv(output_dir + '/read_assignment.csv')
+    total_reads = df.shape[0]
     df['rt_type'] = df.cell_barcode.apply(lambda s:bc_8nt_randhex_dt_dict[s[16:24]])
     df['cell_barcode'] = df.cell_barcode.apply(lambda s:s[:16]+'_'+str(bc_8nt_dict[s[16:24]]))
+    df['well'] = df.cell_barcode.apply(lambda s: int(s.split('_')[-1]))
+    
+    if not (sub_wells is None):
+        df = df.query('well in @sub_wells')
 
     read_counts = df.groupby('cell_barcode').size()
 
@@ -197,14 +245,16 @@ def generate_dge_report(output_dir,genome_dir,chemistry):
     cell_df['cell_barcode'] = pd.Series(barcodes)
     cell_df['species'] = species_assignments.values
     cell_df['well'] = pd.Series(barcodes).apply(lambda s: s.split('_')[-1])
-
+    
+    if len(sample_name)>0:
+        sample_name = sample_name +'_'
     # Write unfiltered matrix data
-    if not os.path.exists(output_dir + 'DGE_unfiltered/'):
-        os.makedirs(output_dir + 'DGE_unfiltered/')
+    if not os.path.exists(output_dir + sample_name + 'DGE_unfiltered/'):
+        os.makedirs(output_dir + sample_name + 'DGE_unfiltered/')
 
-    gene_df.to_csv(output_dir + 'DGE_unfiltered/genes.csv')
-    cell_df.to_csv(output_dir + 'DGE_unfiltered/cell_metadata.csv',index=False)
-    sio.mmwrite(output_dir + 'DGE_unfiltered/DGE.mtx',digital_count_matrix)
+    gene_df.to_csv(output_dir + sample_name + 'DGE_unfiltered/genes.csv')
+    cell_df.to_csv(output_dir + sample_name + 'DGE_unfiltered/cell_metadata.csv',index=False)
+    sio.mmwrite(output_dir + sample_name + 'DGE_unfiltered/DGE.mtx',digital_count_matrix)
 
     # Filter based on automatic cutoff
     valid_cells = np.where(np.array(digital_count_matrix.sum(1)).flatten()>read_thresh)[0]
@@ -213,11 +263,11 @@ def generate_dge_report(output_dir,genome_dir,chemistry):
     cell_df = cell_df.iloc[valid_cells]
 
     # Write filtered matrix data
-    if not os.path.exists(output_dir + 'DGE_filtered/'):
-        os.makedirs(output_dir + 'DGE_filtered/')
-    gene_df.to_csv(output_dir + 'DGE_filtered/genes.csv')
-    cell_df.to_csv(output_dir + 'DGE_filtered/cell_metadata.csv',index=False)
-    sio.mmwrite(output_dir + 'DGE_filtered/DGE.mtx',digital_count_matrix)
+    if not os.path.exists(output_dir + sample_name + 'DGE_filtered/'):
+        os.makedirs(output_dir + sample_name + 'DGE_filtered/')
+    gene_df.to_csv(output_dir + sample_name + 'DGE_filtered/genes.csv')
+    cell_df.to_csv(output_dir + sample_name + 'DGE_filtered/cell_metadata.csv',index=False)
+    sio.mmwrite(output_dir + sample_name + 'DGE_filtered/DGE.mtx',digital_count_matrix)
 
     digital_count_matrix,all_genes,barcodes = generate_dge_matrix(df,read_cutoff=read_thresh)
 
@@ -248,8 +298,8 @@ def generate_dge_report(output_dir,genome_dir,chemistry):
             k,v = line.split('\t')
             stat_dict[k] = int(v)
     stat_dict['Estimated Number of Cells'] = len(barcodes)
-    stat_dict['Mean Reads per Cell'] = stat_dict['fastq_reads']/len(barcodes)
-    stat_dict['Number of Reads'] = stat_dict['fastq_reads']
+    stat_dict['Mean Reads per Cell'] = (stat_dict['fastq_reads'] * df.shape[0]/total_reads)/len(barcodes)
+    stat_dict['Number of Reads'] = stat_dict['fastq_reads'] * df.shape[0]/total_reads
     stat_dict['Sequencing Saturation'] = 1-df.shape[0]/df.counts.sum()
     stat_dict['Valid Barcode Fraction'] = stat_dict['fastq_valid_barcode_reads']/stat_dict['fastq_reads']
     stat_dict['Reads Mapped to Transcriptome'] = stat_dict['mapped_to_transcriptome']/stat_dict['fastq_valid_barcode_reads']
@@ -330,9 +380,11 @@ def generate_dge_report(output_dir,genome_dir,chemistry):
     ax.set_axis_off()
     ax = fig.add_axes([0.5,0.65,0.35,0.35])
     _ = plot_read_thresh(read_counts,ax=ax)
+    ax.set_title(sample_name[:-1])
 
-    ax = fig.add_axes([1,0.65,0.35,0.35])
-    _ = barnyard(species_umi_counts,ax=ax)
+    if len(species)==2:
+        ax = fig.add_axes([1,0.65,0.35,0.35])
+        _ = barnyard(species_umi_counts,ax=ax)
 
     ax = fig.add_axes([0.0,0.05,0.6,0.4])
     for s in species:
@@ -347,4 +399,4 @@ def generate_dge_report(output_dir,genome_dir,chemistry):
     ax.legend()
     ax.set_title('Median UMIs per Cell')
     ax.set_xlabel('Sequencing Reads per Cell')
-    fig.savefig(output_dir +'/analysis_summary.pdf',bbox_inches='tight')
+    fig.savefig(output_dir +'/' + sample_name + 'analysis_summary.pdf',bbox_inches='tight')

@@ -177,10 +177,6 @@ def make_gtf_annotations(species, gtf_filenames, output_dir):
                                      gtf_gene_combined.Attributes.apply(lambda s: get_attribute(s,'gene_name'))))
     gene_id_to_genome = dict(zip(gtf_gene_combined.Attributes.apply(lambda s: get_attribute(s,'gene_id')),
                                  gtf_gene_combined.Chromosome.apply(lambda s:s.split('_')[0])))
-    gene_id_to_strand = dict(zip(gtf_gene_combined.Attributes.apply(lambda s:get_attribute(s,'gene_id')).values,
-                                 gtf_gene_combined.Strand.values))
-    gene_id_to_chrom = dict(zip(gtf_gene_combined.Attributes.apply(lambda s:get_attribute(s,'gene_id')).values,
-                                 gtf_gene_combined.Chromosome.values))
     
     #Save dictionary with gene info
     gene_info = {'gene_bins':gene_dict,
@@ -188,9 +184,7 @@ def make_gtf_annotations(species, gtf_filenames, output_dir):
                  'gene_starts': start_dict,
                  'gene_ends': end_dict,
                  'gene_id_to_name': gene_id_to_gene_names,
-                 'gene_id_to_genome':gene_id_to_genome,
-                 'gene_id_to_chrom':gene_id_to_chrom,
-                 'gene_id_to_strand':gene_id_to_strand
+                 'gene_id_to_genome':gene_id_to_genome
                 }
     
     with open(output_dir+ '/gene_info.pkl', 'wb') as f:
@@ -338,6 +332,7 @@ def preprocess_fastq(fastq1, fastq2, output_dir, chemistry='v1', **params):
     
     fastq_reads = 0
     fastq_valid_barcode_reads = 0
+    seqs_lst,bc1_lst,bc2_lst,bc3_lst = [],[],[],[]
     with gzip.open(fastq1,'rb') as f1, gzip.open(fastq2,'rb') as f2, open(output_dir + 'single_cells_barcoded_head.fastq','w') as fout:
         while True:
             header2 = f2.readline()
@@ -347,6 +342,10 @@ def preprocess_fastq(fastq1, fastq2, output_dir, chemistry='v1', **params):
             bc1 = fix_bc(seq2[bc_starts[2]-1:bc_starts[2]+bc_len],bc1_map)
             bc2 = fix_bc(seq2[bc_starts[1]-1:bc_starts[1]+bc_len+1],bc2_map)
             bc3 = fix_bc(seq2[bc_starts[0]-1:bc_starts[0]+bc_len+1],bc3_map)
+            seqs_lst.append(seq2[:-1])
+            bc1_lst.append(bc1)
+            bc2_lst.append(bc2)
+            bc3_lst.append(bc3)
             umi = seq2[:10]
             strand2 = f2.readline()
             qual2 = f2.readline()
@@ -369,6 +368,12 @@ def preprocess_fastq(fastq1, fastq2, output_dir, chemistry='v1', **params):
                 fout.write(qual1)
                 fastq_valid_barcode_reads += 1
             fastq_reads += 1
+    barcode_df = pd.DataFrame()
+    barcode_df['read2'] = seqs_lst
+    barcode_df['bc1'] = bc1_lst
+    barcode_df['bc2'] = bc2_lst
+    barcode_df['bc3'] = bc3_lst
+    barcode_df.to_csv(output_dir + '/barcode_df.csv')
 
     with open(output_dir + '/pipeline_stats.txt', 'w') as f:
         f.write('fastq_reads\t%d\n' %fastq_reads)
