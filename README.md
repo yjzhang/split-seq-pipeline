@@ -40,8 +40,8 @@ Generate split-seq reference:
 ~~~~
 split-seq mkref --genome hg38 mm10 \
                 --fasta Homo_sapiens.GRCh38.dna.primary_assembly.fa Mus_musculus.GRCm38.dna.primary_assembly.fa \
-                --output_dir <ref_path>/hg38_mm10/ 
                 --genes Homo_sapiens.GRCh38.93.gtf Mus_musculus.GRCm38.93.gtf 
+                --output_dir <ref_path>/hg38_mm10/ 
                 --nthreads 16
 ~~~~
 
@@ -49,5 +49,14 @@ split-seq mkref --genome hg38 mm10 \
 ## Running the pipeline
 
 To see all options, run `split-seq -h`.
+~~~~
+split-seq all --fq1 input_R1.fastq.gz \
+              --fq2 input_R2.fastq.gz \
+              --output_dir <output_dir> \
+              --chemistry v2 \
+              --genome_dir <path_to_ref>/hg38_mm10/ \
+              --nthreads 16
+~~~~
+
 
 ## References
