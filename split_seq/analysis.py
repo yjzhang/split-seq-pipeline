@@ -126,7 +126,7 @@ def get_read_threshold(read_counts):
 
 def plot_read_thresh(read_counts,fig=None,ax=None):
     window = 4
-    read_threshold = get_read_threshold(read_counts)
+    read_threshold = get_read_threshold(read_counts[read_counts>2])
     threshold = len(read_counts[read_counts>read_threshold])
     median_umis = read_counts.sort_values(ascending=False)[:threshold].median()
     if ax is None:
@@ -221,9 +221,7 @@ def generate_single_dge_report(output_dir,genome_dir,chemistry,sample_name='',su
     if not (sub_wells is None):
         df = df.query('well in @sub_wells')
 
-    read_counts = df.groupby('cell_barcode').size()
-
-    read_counts = df.groupby('cell_barcode').size()
+    read_counts = df.groupby('cell_barcode').size().sort_values(ascending=False)
     fig,ax,read_thresh = plot_read_thresh(read_counts)
 
     digital_count_matrix,all_genes,barcodes = generate_dge_matrix(df,read_cutoff=100)
