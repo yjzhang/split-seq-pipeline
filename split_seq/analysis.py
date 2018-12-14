@@ -111,13 +111,23 @@ def barnyard(cell_data,tickstep=10000,s=4,lim=None,ax=None,fig=None):
     else:
         return fig,ax
 
+def get_read_threshold(read_counts):
+    window = 20
+    read_counts = read_counts[read_counts>3]
+    x = np.log10(np.arange(1,len(read_counts)+1))
+    y = np.log10(read_counts).values
+    f = scipy.interpolate.interp1d(x, y,kind='linear')
+    x_hat = np.linspace(x.min(),x.max(),500)
+    y_hat = f(x_hat)
+    y_hat = pd.Series(index=x_hat,data=y_hat)
+    y_hat_prime = (-y_hat).diff(window).iloc[window:].values
+    threshold = 10**y_hat.iloc[np.argmax(y_hat_prime)]
+    return threshold
+
 def plot_read_thresh(read_counts,fig=None,ax=None):
     window = 4
-    sorted_read_counts = pd.Series(np.log10(read_counts.sort_values(ascending=False).values))
-    x = np.log10(sorted_read_counts.groupby(sorted_read_counts).size()[::-1].cumsum())
-    y = pd.Series(sorted_read_counts.groupby(sorted_read_counts).size()[::-1].index)
-    threshold = int((pd.Series(pd.rolling_mean(y.diff().values/x.diff().values,window)).idxmin()-window/2.))
-    read_threshold = read_counts.sort_values(ascending=False)[threshold]
+    read_threshold = get_read_threshold(read_counts)
+    threshold = len(read_counts[read_counts>read_threshold])
     median_umis = read_counts.sort_values(ascending=False)[:threshold].median()
     if ax is None:
         fig = plt.figure(figsize=(4,4))
@@ -139,6 +149,7 @@ def plot_read_thresh(read_counts,fig=None,ax=None):
         return read_threshold
     else:
         return fig,ax,read_threshold
+    
 def parse_wells(s):
     wells = np.arange(48,dtype=int).reshape(4,12)
     try:
