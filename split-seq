@@ -22,11 +22,12 @@ import datetime
 
 parser = argparse.ArgumentParser()
 
-parser.add_argument('mode', help="""Mode: one of "all", "preproc", "star", or "postproc".
+parser.add_argument('mode', help="""Mode: one of "all", "preproc", "star", "postproc", or "mkref".
 "all" runs the entire pipeline.
 "preproc" or "preprocess" runs all the steps prior to running STAR, producing a file called single_cells_barcoded_head.fastq in output_dir.
 "star" assumes that output of preproc exists in output_dir, and tries to run the STAR alignment, producing a file called single_cells_barcoded_headAligned.out.sam.
 "postproc" assumes that the output of star exists in  output_dir.
+"mkref" creates a STAR index for a reference genome. This requires the --genome, --genes, --fasta, and --output_dir options.
 """)
 parser.add_argument('--fq1', help='fastq1 - mRNA reads')
 parser.add_argument('--fq2', help='fastq2 - reads contain UMI and barcodes')
@@ -39,7 +40,7 @@ parser.add_argument('--sample', action='append', nargs=2, metavar=('SAMPLE_NAME'
 #parser.add_argument('--star_path', default='./', help='path containing STAR')
 parser.add_argument('--genome', nargs='*', help='name(s) of genome(s)/species')
 parser.add_argument('--genes', nargs='*', help='GTF file(s) with gene annotations')
-parser.add_argument('--fasta', nargs='*', help='GTF file(s) with gene annotations')
+parser.add_argument('--fasta', nargs='*', help='List of FASTA files for the given genome(s). There should be one fasta file per genome.')
 parser.add_argument('--nthreads', default='4', help='number of threads to use')
 
 args = parser.parse_args()
@@ -54,6 +55,9 @@ print(args.genome_dir)
 
 mode = args.mode.lower()
 if mode == 'mkref':
+    print(args.genome)
+    print(args.genes)
+    print(args.fasta)
 
     # Generate genome
     tools.make_combined_genome(args.genome, args.fasta, args.output_dir)
