@@ -299,12 +299,22 @@ def preprocess_fastq(fastq1, fastq2, output_dir, chemistry='v1', **params):
 
     if chemistry=='v1':
         bc_8nt_RT = bc_8nt
+        bc_8nt_rnd2 = bc_8nt
+        bc_8nt_rnd3 = bc_8nt
         # Amplicon sequence
         amp_seq = 'NNNNNNNNNNIIIIIIIIGTGGCCGATGTTTCGCATCGGCGTACGACTIIIIIIIIATCCACGTGCTTGAGAGGCCAGAGCATTCGIIIIIIII'
-    else:
+    elif chemistry=='v2':
         bc_8nt_RT = pd.read_csv(PATH + '/barcodes/bc_8nt_v2.csv',names=['barcode'],index_col=0).barcode
+        bc_8nt_rnd2 = bc_8nt
+        bc_8nt_rnd3 = bc_8nt
         # Amplicon sequence
         amp_seq = 'NNNNNNNNNNIIIIIIIIGTGGCCGATGTTTCGCATCGGCGTACGACTIIIIIIIIATCCACGTGCTTGAGACTGTGGIIIIIIII'
+    else:
+        bc_8nt_RT = pd.read_csv(PATH + '/barcodes/bc_8nt_v2.csv',names=['barcode'],index_col=0).barcode
+        bc_8nt_rnd2 = pd.read_csv(PATH + '/barcodes/bc_8nt_rnd2_v2.csv',names=['barcode'],index_col=0).barcode
+        bc_8nt_rnd3 = pd.read_csv(PATH + '/barcodes/bc_8nt_rnd3_v2.csv',names=['barcode'],index_col=0).barcode
+        # Amplicon sequence
+        amp_seq = 'NNNNNNNNNNIIIIIIIITGTTTCGCATCGGCIIIIIIIIGCTTGTGACTGTGGIIIIIIII'
 
     # Get location of cell barcodes in amplicon:
     bc_len = 8
@@ -320,13 +330,13 @@ def preprocess_fastq(fastq1, fastq2, output_dir, chemistry='v1', **params):
     # Generate bc_map dictionary for each cell barcode.
     bc3_pre = amp_seq[bc_starts[0]-2:bc_starts[0]]
     bc3_suf = amp_seq[bc_starts[0]+8:bc_starts[0]+10]
-    bc3_map = bc_editd1_correction(bc_8nt.values,
+    bc3_map = bc_editd1_correction(bc_8nt_rnd3.values,
                                    bc_pre=bc3_pre,
                                    bc_suf=bc3_suf)
 
     bc2_pre = amp_seq[bc_starts[1]-2:bc_starts[1]]
     bc2_suf = amp_seq[bc_starts[1]+8:bc_starts[1]+10]
-    bc2_map = bc_editd1_correction(bc_8nt.values,
+    bc2_map = bc_editd1_correction(bc_8nt_rnd2.values,
                                    bc_pre=bc2_pre,
                                    bc_suf=bc2_suf)
     bc1_pre = amp_seq[bc_starts[2]-2:bc_starts[2]]
