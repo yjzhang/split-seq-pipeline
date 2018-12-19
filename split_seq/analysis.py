@@ -5,7 +5,7 @@ import scipy.sparse
 import scipy
 import gzip
 import collections
-from collections import defaultdict
+from collections import defaultdict, Counter
 import scipy.sparse as sp_sparse
 import warnings
 import pickle
@@ -17,6 +17,10 @@ import pylab as plt
 fsize=14
 
 PATH = os.path.dirname(__file__)
+
+rc_dict = dict(zip(list('NACGT'),list('NTGCA')))
+def reverse_complement(seq):
+    return ''.join([rc_dict[s] for s in seq][::-1])
 
 def generate_dge_matrix(df,read_cutoff=100):
     reads_per_cell = df.groupby(df.cell_barcode).size()
@@ -111,13 +115,23 @@ def barnyard(cell_data,tickstep=10000,s=4,lim=None,ax=None,fig=None):
     else:
         return fig,ax
 
+def get_read_threshold(read_counts):
+    window = 20
+    read_counts = read_counts[read_counts>3]
+    x = np.log10(np.arange(1,len(read_counts)+1))
+    y = np.log10(read_counts).values
+    f = scipy.interpolate.interp1d(x, y,kind='linear')
+    x_hat = np.linspace(x.min(),x.max(),500)
+    y_hat = f(x_hat)
+    y_hat = pd.Series(index=x_hat,data=y_hat)
+    y_hat_prime = (-y_hat).diff(window).iloc[window:].values
+    threshold = 10**y_hat.iloc[np.argmax(y_hat_prime)]
+    return threshold
+
 def plot_read_thresh(read_counts,fig=None,ax=None):
     window = 4
-    sorted_read_counts = pd.Series(np.log10(read_counts.sort_values(ascending=False).values))
-    x = np.log10(sorted_read_counts.groupby(sorted_read_counts).size()[::-1].cumsum())
-    y = pd.Series(sorted_read_counts.groupby(sorted_read_counts).size()[::-1].index)
-    threshold = int((pd.Series(pd.rolling_mean(y.diff().values/x.diff().values,window)).idxmin()-window/2.))
-    read_threshold = read_counts.sort_values(ascending=False)[threshold]
+    read_threshold = get_read_threshold(read_counts[read_counts>2])
+    threshold = len(read_counts[read_counts>read_threshold])
     median_umis = read_counts.sort_values(ascending=False)[:threshold].median()
     if ax is None:
         fig = plt.figure(figsize=(4,4))
@@ -139,6 +153,7 @@ def plot_read_thresh(read_counts,fig=None,ax=None):
         return read_threshold
     else:
         return fig,ax,read_threshold
+    
 def parse_wells(s):
     wells = np.arange(48,dtype=int).reshape(4,12)
     try:
@@ -184,7 +199,8 @@ def generate_all_dge_reports(output_dir, genome_dir, chemistry, samples):
         generate_single_dge_report(output_dir,genome_dir,chemistry)
 
 def generate_single_dge_report(output_dir,genome_dir,chemistry,sample_name='',sub_wells=None):
-
+    
+    # Load gene_info dictionary to assign genes to reads
     with open(genome_dir +'/gene_info.pkl', 'rb') as f:
         gene_info = pickle.load(f)
 
@@ -195,24 +211,27 @@ def generate_single_dge_report(output_dir,genome_dir,chemistry,sample_name='',su
     gene_id_to_name = gene_info['gene_id_to_name']
     gene_id_to_genome = gene_info['gene_id_to_genome']
 
+    # Load the RT barcodes to collapse randhex with dT primers
     bc_8nt = pd.read_csv('/home/ubuntu/split-seq-pipeline/split_seq/barcodes/bc_8nt_%s.csv'  %chemistry,
                          index_col=0,
                          names=['barcode']).barcode
+    bc_to_well = dict(zip(bc_8nt.values,range(96)))
     bc_8nt_dict = dict(zip(bc_8nt.values,list(range(48))+list(range(48))))
     bc_8nt_randhex_dt_dict = dict(zip(bc_8nt.values,['dt']*48+['randhex']*48))
 
+    # Load the read_assignment file
     df = pd.read_csv(output_dir + '/read_assignment.csv')
     total_reads = df.shape[0]
     df['rt_type'] = df.cell_barcode.apply(lambda s:bc_8nt_randhex_dt_dict[s[16:24]])
     df['cell_barcode'] = df.cell_barcode.apply(lambda s:s[:16]+'_'+str(bc_8nt_dict[s[16:24]]))
     df['well'] = df.cell_barcode.apply(lambda s: int(s.split('_')[-1]))
     
+    # Check if performing analysis on a subset of wells
     if not (sub_wells is None):
         df = df.query('well in @sub_wells')
-
-    read_counts = df.groupby('cell_barcode').size()
-
-    read_counts = df.groupby('cell_barcode').size()
+    else:
+        sub_wells = list(range(48))
+    read_counts = df.groupby('cell_barcode').size().sort_values(ascending=False)
     fig,ax,read_thresh = plot_read_thresh(read_counts)
 
     digital_count_matrix,all_genes,barcodes = generate_dge_matrix(df,read_cutoff=100)
@@ -248,6 +267,7 @@ def generate_single_dge_report(output_dir,genome_dir,chemistry,sample_name='',su
     
     if len(sample_name)>0:
         sample_name = sample_name +'_'
+    
     # Write unfiltered matrix data
     if not os.path.exists(output_dir + sample_name + 'DGE_unfiltered/'):
         os.makedirs(output_dir + sample_name + 'DGE_unfiltered/')
@@ -289,6 +309,63 @@ def generate_single_dge_report(output_dir,genome_dir,chemistry,sample_name='',su
     for s in species:
         species_assignments.loc[np.where((species_umi_counts[s]/species_umi_counts.sum(1))>0.9)] = s
 
+        
+    # Calculate rRNA Percentage:
+    kmer_len = 30
+    rrna_sense_kmer_dict = {}
+    rrna_antisense_kmer_dict = {}
+    with open('/home/ubuntu/split-seq-pipeline/split_seq/rRNA.fa') as f:
+        while True:
+            line = f.readline()[:-1]
+            if len(line)==0:
+                break
+            if line[0]!='>':
+                for i in range(len(line)-kmer_len):
+                    kmer = line[i:i+kmer_len]
+                    rrna_sense_kmer_dict[kmer] = 0
+                line = reverse_complement(line)
+                for i in range(len(line)-kmer_len):
+                    kmer = line[i:i+kmer_len]
+                    rrna_antisense_kmer_dict[kmer] = 0
+
+    def search_rrna_sense_kmers(seq):
+        found = False
+        for i in range(0,41,10):
+            try:
+                rrna_sense_kmer_dict[seq[i:i+kmer_len]]
+                found = True
+            except:
+                pass
+        return found
+
+    def search_rrna_antisense_kmers(seq):
+        found = False
+        for i in range(0,41,10):
+            try:
+                rrna_antisense_kmer_dict[seq[i:i+kmer_len]]
+                found = True
+            except:
+                pass
+        return found
+    
+    fastqfile = output_dir + '/single_cells_barcoded_head.fastq'
+    well_rrna_counts = defaultdict(Counter)
+    with open(fastqfile) as f:
+        for i in range(1000000):
+            header = f.readline()
+            seq = f.readline()[:-1]
+            f.readline()
+            f.readline()
+            well = bc_to_well[header[17:17+8]]
+            well_rrna_counts['total_counts'][well] += 1
+            if search_rrna_sense_kmers(seq):
+                well_rrna_counts['rRNA_sense_counts'][well] += 1
+            if search_rrna_antisense_kmers(seq):
+                well_rrna_counts['rRNA_antisense_counts'][well] += 1
+    well_rrna_counts = pd.DataFrame(well_rrna_counts).loc[sub_wells+list(np.array(sub_wells)+48)]    
+    well_rrna_fraction = (well_rrna_counts.T/well_rrna_counts.total_counts).T.iloc[:,:2]
+    rrna_fraction = well_rrna_counts.sum(0).iloc[:2]/well_rrna_counts.sum(0).iloc[2]
+    
     stat_dict = {}
     with open(output_dir + '/pipeline_stats.txt') as f:
         while True:
@@ -302,6 +379,7 @@ def generate_single_dge_report(output_dir,genome_dir,chemistry,sample_name='',su
     stat_dict['Number of Reads'] = stat_dict['fastq_reads'] * df.shape[0]/total_reads
     stat_dict['Sequencing Saturation'] = 1-df.shape[0]/df.counts.sum()
     stat_dict['Valid Barcode Fraction'] = stat_dict['fastq_valid_barcode_reads']/stat_dict['fastq_reads']
+    stat_dict['Reads Mapped to rRNA'] = rrna_fraction.iloc[:2].sum()
     stat_dict['Reads Mapped to Transcriptome'] = stat_dict['mapped_to_transcriptome']/stat_dict['fastq_valid_barcode_reads']
     for s in species:
         stat_dict['%s Fraction Reads in Cells' %s] = digital_count_matrix[:,species_gene_inds[s]].sum()/\
@@ -326,6 +404,7 @@ def generate_single_dge_report(output_dir,genome_dir,chemistry,sample_name='',su
                         'Number of Reads',
                         'Sequencing Saturation',
                         'Valid Barcode Fraction',
+                        'Reads Mapped to rRNA',
                         'Reads Mapped to Transcriptome',
                         'Fraction Reads in Cells'
                        ]
@@ -367,7 +446,7 @@ def generate_single_dge_report(output_dir,genome_dir,chemistry,sample_name='',su
     # Generate summary PDF
     fig = plt.figure(figsize=(8,8))
     ax = fig.add_axes([0,0.5,0.45,0.5])
-    h = 0.975
+    h = 1
     c =0
     for k in stat_catagories:
         if c<9:
