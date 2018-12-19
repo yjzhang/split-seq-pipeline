@@ -369,7 +369,7 @@ def preprocess_fastq(fastq1, fastq2, output_dir, chemistry='v1', **params):
             
             if len(cellbc_umi)==35:
                 TSO_location = seq1.find('AAGCAGTGGTATCAACGCAGAGTGAATGGG')
-                if 0>=TSO_location<20:
+                if 0<=TSO_location<20:
                     seq1 = seq1[TSO_location+30:]
                     qual1 = qual1[TSO_location+30:]
                 header1 = '@' + bc3 + bc2 + bc1 +'_' + umi + '_' + qual2.decode("utf-8")[:10] + '_' + header1[1:]

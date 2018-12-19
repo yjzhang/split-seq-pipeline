@@ -91,7 +91,7 @@ if mode == 'all':
         processv2.molecule_info(args.genome_dir, args.output_dir, args.nthreads)
 
         print(datetime.datetime.now(),'Generating digital gene expression matrix...') 
-        analysis.generate_dge_report(args.output_dir,args.genome_dir,args.chemistry)
+        analysis.generate_all_dge_reports(args.output_dir,args.genome_dir,args.chemistry,args.sample)
 
         print(datetime.datetime.now(),'Finished successfully')
     else:
