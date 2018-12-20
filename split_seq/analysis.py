@@ -22,7 +22,7 @@ rc_dict = dict(zip(list('NACGT'),list('NTGCA')))
 def reverse_complement(seq):
     return ''.join([rc_dict[s] for s in seq][::-1])
 
-def generate_dge_matrix(df,read_cutoff=100):
+def generate_dge_matrix(df,read_cutoff=10):
     reads_per_cell = df.groupby(df.cell_barcode).size()
     cells = reads_per_cell[reads_per_cell>3]
     all_genes = pd.Series(df.gene.unique()).sort_values()
