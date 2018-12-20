@@ -175,7 +175,7 @@ def parse_wells(s):
                 e_row = row_letter_to_number[end[:1]]
                 e_col = int(end[1:])-1
                 sub_wells += list(np.arange(wells[s_row,s_col],wells[e_row,e_col]+1))
-        sub_wells = np.unique(sub_wells)
+        sub_wells = list(np.unique(sub_wells))
     except:
         sub_wells = 'Failed'
     return sub_wells
