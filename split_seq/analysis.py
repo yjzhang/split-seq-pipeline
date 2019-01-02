@@ -584,8 +584,8 @@ def generate_single_dge_report(output_dir,genome_dir,chemistry,sample_name='',su
     cm = plt.imshow(cell_counts_by_rnd2_well.values.reshape(8,12),cmap=plt.cm.Reds)
     plt.gca().set_xticks(range(0,12))
     plt.gca().set_xticklabels(range(1,13))
-    plt.gca().set_yticks(range(0,4))
-    plt.gca().set_yticklabels(list('ABCD'))
+    plt.gca().set_yticks(range(0,8))
+    plt.gca().set_yticklabels(list('ABCDEFGH'))
     plt.gca().set_title('Round2: Cells per Well')
     plt.colorbar(cm,pad=0.02,aspect=10,shrink=0.7)
     
@@ -593,8 +593,8 @@ def generate_single_dge_report(output_dir,genome_dir,chemistry,sample_name='',su
     cm = plt.imshow(cell_counts_by_rnd3_well.values.reshape(8,12),cmap=plt.cm.Reds)
     plt.gca().set_xticks(range(0,12))
     plt.gca().set_xticklabels(range(1,13))
-    plt.gca().set_yticks(range(0,4))
-    plt.gca().set_yticklabels(list('ABCD'))
+    plt.gca().set_yticks(range(0,8))
+    plt.gca().set_yticklabels(list('ABCDEFGH'))
     plt.gca().set_title('Round3: Cells per Well')
     plt.colorbar(cm,pad=0.02,aspect=10,shrink=0.7)
     
