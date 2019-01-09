@@ -125,7 +125,7 @@ def get_read_threshold(read_counts):
     y_hat = f(x_hat)
     y_hat = pd.Series(index=x_hat,data=y_hat)
     y_hat_prime = (-y_hat).diff(window).iloc[window:].values
-    threshold = 10**y_hat.iloc[np.argmax(y_hat_prime)]
+    threshold = 10**y_hat.iloc[np.argmax(y_hat_prime)]*0.5
     return threshold
 
 def plot_read_thresh(read_counts,fig=None,ax=None):
@@ -241,7 +241,7 @@ def generate_single_dge_report(output_dir,genome_dir,chemistry,sample_name='',su
     read_counts = df.groupby('cell_barcode').size().sort_values(ascending=False)
     fig,ax,read_thresh = plot_read_thresh(read_counts)
 
-    digital_count_matrix,all_genes,barcodes = generate_dge_matrix(df,read_cutoff=100)
+    digital_count_matrix,all_genes,barcodes = generate_dge_matrix(df,read_cutoff=10)
 
     gene_df = pd.DataFrame()
     gene_df['gene_id'] = all_genes
@@ -320,8 +320,9 @@ def generate_single_dge_report(output_dir,genome_dir,chemistry,sample_name='',su
     species_assignments = pd.Series(['multiplet' for i in range(len(barcodes))])
     for s in species:
         species_assignments.loc[np.where((species_umi_counts[s]/species_umi_counts.sum(1))>0.9)] = s
-
-        
+    species = np.unique(species_assignments.values)
+    species = species[species!='multiplet']
+ 
     # Calculate rRNA Percentage:
     kmer_len = 30
     rrna_sense_kmer_dict = {}
@@ -369,6 +370,7 @@ def generate_single_dge_report(output_dir,genome_dir,chemistry,sample_name='',su
     
     fastqfile = output_dir + '/single_cells_barcoded_head.fastq'
     well_counts = defaultdict(Counter)
+    read_lengths = Counter()
     with open(fastqfile) as f:
         for i in range(1000000):
             header = f.readline()
@@ -377,6 +379,7 @@ def generate_single_dge_report(output_dir,genome_dir,chemistry,sample_name='',su
             f.readline()
             well = bc_to_well[header[17:17+8]]
             well_counts['total_counts'][well] += 1
+            read_lengths[len(seq)]+=1
             if search_kmers(seq,rrna_sense_kmer_dict):
                 well_counts['rRNA_sense_counts'][well] += 1
             if search_kmers(seq,rrna_antisense_kmer_dict):
@@ -385,6 +388,9 @@ def generate_single_dge_report(output_dir,genome_dir,chemistry,sample_name='',su
                 well_counts['mt_rRNA_sense_counts'][well] += 1
             if search_kmers(seq,mt_rrna_antisense_kmer_dict):
                 well_counts['mt_rRNA_antisense_counts'][well] += 1
+    read_len = max(read_lengths.keys())
+    read_len_trimmed = read_len - 30
+    tso_fraction = read_lengths[read_len_trimmed]/sum(read_lengths.values())
     cols = ['rRNA_sense_counts','rRNA_antisense_counts','total_counts']
     well_rrna_counts = pd.DataFrame(well_counts)[cols].loc[sub_wells+list(np.array(sub_wells)+48)]
     well_rrna_counts_dt = pd.DataFrame(well_rrna_counts).loc[sub_wells]
@@ -426,6 +432,7 @@ def generate_single_dge_report(output_dir,genome_dir,chemistry,sample_name='',su
     stat_dict['Reads Mapped to mt-rRNA'] = mt_rrna_fraction.iloc[:2].sum()
     stat_dict['Reads Mapped to mt-rRNA (dT)'] = mt_rrna_fraction_dt.iloc[:2].sum()
     stat_dict['Reads Mapped to mt-rRNA (randhex)'] = mt_rrna_fraction_randhex.iloc[:2].sum()
+    stat_dict['TSO Fraction in Read1'] = tso_fraction
     stat_dict['Reads Mapped to Transcriptome'] = stat_dict['mapped_to_transcriptome']/stat_dict['fastq_valid_barcode_reads']
     for s in species:
         stat_dict['%s Fraction Reads in Cells' %s] = digital_count_matrix[:,species_gene_inds[s]].sum()/\
@@ -459,6 +466,7 @@ def generate_single_dge_report(output_dir,genome_dir,chemistry,sample_name='',su
                         'Reads Mapped to mt-rRNA',
                         'Reads Mapped to mt-rRNA (dT)',
                         'Reads Mapped to mt-rRNA (randhex)',
+                        'TSO Fraction in Read1',
                         'Reads Mapped to Transcriptome',
                         'Fraction Reads in Cells'
                        ]
@@ -478,7 +486,7 @@ def generate_single_dge_report(output_dir,genome_dir,chemistry,sample_name='',su
     species_read_proportions = df.groupby('genome').size()/df.groupby('genome').size().sum()
     gene_counts_subsampled_df = {}
     umi_counts_subsampled_df = {}
-    for s in df.genome.unique():
+    for s in species:
         seq_depth = species_read_proportions[s] * \
                     stat_dict['Number of Reads']/stat_dict['%s Number of Cells Detected' %s]
         gene_counts_subsampled = {0:0}
@@ -492,11 +500,11 @@ def generate_single_dge_report(output_dir,genome_dir,chemistry,sample_name='',su
             gene_counts_subsampled[subsample] = (species_df[sub_sampled_counts>0]
                                                         .groupby('cell_barcode')
                                                         .gene.apply(lambda x:len(np.unique(x)))
-                                                        .loc[barcodes[np.where(species_assignments==s)]]).median()
+                                                        .reindex[barcodes[np.where(species_assignments==s)]]).median()
             umi_counts_subsampled[subsample] = (species_df[sub_sampled_counts>0]
                                                         .groupby('cell_barcode')
                                                         .umi.size()
-                                                        .loc[barcodes[np.where(species_assignments==s)]]).median()
+                                                        .reindex[barcodes[np.where(species_assignments==s)]]).median()
         gene_counts_subsampled_df[s] = pd.Series(gene_counts_subsampled).fillna(0)
         umi_counts_subsampled_df[s] = pd.Series(umi_counts_subsampled).fillna(0)
         

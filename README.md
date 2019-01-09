@@ -27,13 +27,13 @@ gunzip Homo_sapiens.GRCh38.93.gtf.gz
 Download mouse reference genome<br>
 ~~~~
 wget ftp://ftp.ensembl.org/pub/release-93/fasta/mus_musculus/dna/Mus_musculus.GRCm38.dna.primary_assembly.fa.gz
-gunzip Homo_sapiens.GRCh38.dna.primary_assembly.fa.gz
+gunzip Mus_musculus.GRCm38.dna.primary_assembly.fa.gz
 ~~~~
 
 Download mouse reference gtf file:<br>
 ~~~~
-wget ftp://ftp.ensembl.org/pub/release-93/gtf/mus_musculus/Mus_musculus.GRCm38.93.gtf
-gunzip Homo_sapiens.GRCh38.93.gtf.gz
+wget ftp://ftp.ensembl.org/pub/release-93/gtf/mus_musculus/Mus_musculus.GRCm38.93.gtf.gz
+gunzip Mus_musculus.GRCm38.93.gtf.gz
 ~~~~
 
 Generate split-seq reference:
