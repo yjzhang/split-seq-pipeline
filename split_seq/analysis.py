@@ -500,11 +500,11 @@ def generate_single_dge_report(output_dir,genome_dir,chemistry,sample_name='',su
             gene_counts_subsampled[subsample] = (species_df[sub_sampled_counts>0]
                                                         .groupby('cell_barcode')
                                                         .gene.apply(lambda x:len(np.unique(x)))
-                                                        .reindex[barcodes[np.where(species_assignments==s)]]).median()
+                                                        .reindex(barcodes[np.where(species_assignments==s)])).median()
             umi_counts_subsampled[subsample] = (species_df[sub_sampled_counts>0]
                                                         .groupby('cell_barcode')
                                                         .umi.size()
-                                                        .reindex[barcodes[np.where(species_assignments==s)]]).median()
+                                                        .reindex(barcodes[np.where(species_assignments==s)])).median()
         gene_counts_subsampled_df[s] = pd.Series(gene_counts_subsampled).fillna(0)
         umi_counts_subsampled_df[s] = pd.Series(umi_counts_subsampled).fillna(0)
         
