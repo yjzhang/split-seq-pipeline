@@ -414,4 +414,5 @@ def sort_sam(output_dir, nthreads):
     """ Sort samfile by header (cell_barcodes, umi) """
     nthreads = int(nthreads)
     rc = subprocess.call(SAMTOOLS_PATH + """ sort -n -@ {1} -T {0}/single_cells_barcoded_headAligned.sort -o {0}/single_cells_barcoded_headAligned.sorted.bam {0}/single_cells_barcoded_headAligned.out.sam""".format(output_dir, nthreads), shell=True)
+    os.remove("""{0}/single_cells_barcoded_headAligned.out.sam""".format(output_dir))
     return rc
