@@ -22,7 +22,7 @@ rc_dict = dict(zip(list('NACGT'),list('NTGCA')))
 def reverse_complement(seq):
     return ''.join([rc_dict[s] for s in seq][::-1])
 
-def generate_dge_matrix(df,read_cutoff=100):
+def generate_dge_matrix(df,read_cutoff=10):
     reads_per_cell = df.groupby(df.cell_barcode).size()
     cells = reads_per_cell[reads_per_cell>3]
     all_genes = pd.Series(df.gene.unique()).sort_values()
@@ -109,7 +109,7 @@ def barnyard(cell_data,tickstep=10000,s=4,lim=None,ax=None,fig=None):
     ax.tick_params(labelsize=fsize)
     ax.yaxis.tick_left()
     ax.xaxis.tick_bottom()
-    ax.legend(bbox_to_anchor=(0.08,1.0),fontsize=fsize-1,handletextpad=0.025)
+    ax.legend(fontsize=fsize-1,handletextpad=0.025)
     if fig is None:
         return 0
     else:
@@ -125,7 +125,7 @@ def get_read_threshold(read_counts):
     y_hat = f(x_hat)
     y_hat = pd.Series(index=x_hat,data=y_hat)
     y_hat_prime = (-y_hat).diff(window).iloc[window:].values
-    threshold = 10**y_hat.iloc[np.argmax(y_hat_prime)]
+    threshold = 10**y_hat.iloc[np.argmax(y_hat_prime)]*0.5
     return threshold
 
 def plot_read_thresh(read_counts,fig=None,ax=None):
@@ -175,7 +175,7 @@ def parse_wells(s):
                 e_row = row_letter_to_number[end[:1]]
                 e_col = int(end[1:])-1
                 sub_wells += list(np.arange(wells[s_row,s_col],wells[e_row,e_col]+1))
-        sub_wells = np.unique(sub_wells)
+        sub_wells = list(np.unique(sub_wells))
     except:
         sub_wells = 'Failed'
     return sub_wells
@@ -198,7 +198,7 @@ def generate_all_dge_reports(output_dir, genome_dir, chemistry, samples):
     else:
         generate_single_dge_report(output_dir,genome_dir,chemistry)
 
-def generate_single_dge_report(output_dir,genome_dir,chemistry,sample_name='',sub_wells=None):
+def generate_single_dge_report(output_dir,genome_dir,chemistry,sample_name='',sub_wells=None, read_thresh=None):
     
     # Load gene_info dictionary to assign genes to reads
     with open(genome_dir +'/gene_info.pkl', 'rb') as f:
@@ -218,6 +218,12 @@ def generate_single_dge_report(output_dir,genome_dir,chemistry,sample_name='',su
     bc_to_well = dict(zip(bc_8nt.values,range(96)))
     bc_8nt_dict = dict(zip(bc_8nt.values,list(range(48))+list(range(48))))
     bc_8nt_randhex_dt_dict = dict(zip(bc_8nt.values,['dt']*48+['randhex']*48))
+    
+    # Load the Ligation barcodes:
+    bc_8nt_lig = pd.read_csv('/home/ubuntu/split-seq-pipeline/split_seq/barcodes/bc_8nt_v1.csv',
+                         index_col=0,
+                         names=['barcode']).barcode
+    bc_to_well_lig = dict(zip(bc_8nt_lig.values,range(96)))
 
     # Load the read_assignment file
     df = pd.read_csv(output_dir + '/read_assignment.csv')
@@ -225,6 +231,7 @@ def generate_single_dge_report(output_dir,genome_dir,chemistry,sample_name='',su
     df['rt_type'] = df.cell_barcode.apply(lambda s:bc_8nt_randhex_dt_dict[s[16:24]])
     df['cell_barcode'] = df.cell_barcode.apply(lambda s:s[:16]+'_'+str(bc_8nt_dict[s[16:24]]))
     df['well'] = df.cell_barcode.apply(lambda s: int(s.split('_')[-1]))
+    
     
     # Check if performing analysis on a subset of wells
     if not (sub_wells is None):
@@ -234,7 +241,7 @@ def generate_single_dge_report(output_dir,genome_dir,chemistry,sample_name='',su
     read_counts = df.groupby('cell_barcode').size().sort_values(ascending=False)
     fig,ax,read_thresh = plot_read_thresh(read_counts)
 
-    digital_count_matrix,all_genes,barcodes = generate_dge_matrix(df,read_cutoff=100)
+    digital_count_matrix,all_genes,barcodes = generate_dge_matrix(df,read_cutoff=10)
 
     gene_df = pd.DataFrame()
     gene_df['gene_id'] = all_genes
@@ -263,7 +270,12 @@ def generate_single_dge_report(output_dir,genome_dir,chemistry,sample_name='',su
     cell_df = pd.DataFrame()
     cell_df['cell_barcode'] = pd.Series(barcodes)
     cell_df['species'] = species_assignments.values
-    cell_df['well'] = pd.Series(barcodes).apply(lambda s: s.split('_')[-1])
+    cell_df['rnd1_well'] = pd.Series(barcodes).apply(lambda s: int(s.split('_')[-1]))
+    cell_df['rnd2_well'] = pd.Series(barcodes).apply(lambda s: bc_to_well_lig[s[8:16]])
+    cell_df['rnd3_well'] = pd.Series(barcodes).apply(lambda s: bc_to_well_lig[s[:8]])
+    cell_df['umi_count'] = np.array(digital_count_matrix.sum(1)).flatten()
+    cell_df['umi_count_50dup'] = cell_df['umi_count'] * 0.5/(1-df.shape[0]/df.counts.sum())
+    cell_df['gene_count'] = np.array((digital_count_matrix>0).sum(1)).flatten()
     
     if len(sample_name)>0:
         sample_name = sample_name +'_'
@@ -288,7 +300,7 @@ def generate_single_dge_report(output_dir,genome_dir,chemistry,sample_name='',su
     gene_df.to_csv(output_dir + sample_name + 'DGE_filtered/genes.csv')
     cell_df.to_csv(output_dir + sample_name + 'DGE_filtered/cell_metadata.csv',index=False)
     sio.mmwrite(output_dir + sample_name + 'DGE_filtered/DGE.mtx',digital_count_matrix)
-
+        
     digital_count_matrix,all_genes,barcodes = generate_dge_matrix(df,read_cutoff=read_thresh)
 
     species_genes = {}
@@ -308,8 +320,9 @@ def generate_single_dge_report(output_dir,genome_dir,chemistry,sample_name='',su
     species_assignments = pd.Series(['multiplet' for i in range(len(barcodes))])
     for s in species:
         species_assignments.loc[np.where((species_umi_counts[s]/species_umi_counts.sum(1))>0.9)] = s
-
-        
+    species = np.unique(species_assignments.values)
+    species = species[species!='multiplet']
+ 
     # Calculate rRNA Percentage:
     kmer_len = 30
     rrna_sense_kmer_dict = {}
@@ -327,29 +340,37 @@ def generate_single_dge_report(output_dir,genome_dir,chemistry,sample_name='',su
                 for i in range(len(line)-kmer_len):
                     kmer = line[i:i+kmer_len]
                     rrna_antisense_kmer_dict[kmer] = 0
+    
+    kmer_len = 30
+    mt_rrna_sense_kmer_dict = {}
+    mt_rrna_antisense_kmer_dict = {}
+    with open('/home/ubuntu/split-seq-pipeline/split_seq/mt_rRNA.fa') as f:
+        while True:
+            line = f.readline()[:-1]
+            if len(line)==0:
+                break
+            if line[0]!='>':
+                for i in range(len(line)-kmer_len):
+                    kmer = line[i:i+kmer_len]
+                    mt_rrna_sense_kmer_dict[kmer] = 0
+                line = reverse_complement(line)
+                for i in range(len(line)-kmer_len):
+                    kmer = line[i:i+kmer_len]
+                    mt_rrna_antisense_kmer_dict[kmer] = 0
 
-    def search_rrna_sense_kmers(seq):
+    def search_kmers(seq,kmer_dict):
         found = False
         for i in range(0,41,10):
             try:
-                rrna_sense_kmer_dict[seq[i:i+kmer_len]]
-                found = True
-            except:
-                pass
-        return found
-
-    def search_rrna_antisense_kmers(seq):
-        found = False
-        for i in range(0,41,10):
-            try:
-                rrna_antisense_kmer_dict[seq[i:i+kmer_len]]
+                kmer_dict[seq[i:i+kmer_len]]
                 found = True
             except:
                 pass
         return found
     
     fastqfile = output_dir + '/single_cells_barcoded_head.fastq'
-    well_rrna_counts = defaultdict(Counter)
+    well_counts = defaultdict(Counter)
+    read_lengths = Counter()
     with open(fastqfile) as f:
         for i in range(1000000):
             header = f.readline()
@@ -357,14 +378,40 @@ def generate_single_dge_report(output_dir,genome_dir,chemistry,sample_name='',su
             f.readline()
             f.readline()
             well = bc_to_well[header[17:17+8]]
-            well_rrna_counts['total_counts'][well] += 1
-            if search_rrna_sense_kmers(seq):
-                well_rrna_counts['rRNA_sense_counts'][well] += 1
-            if search_rrna_antisense_kmers(seq):
-                well_rrna_counts['rRNA_antisense_counts'][well] += 1
-    well_rrna_counts = pd.DataFrame(well_rrna_counts).loc[sub_wells+list(np.array(sub_wells)+48)]    
+            well_counts['total_counts'][well] += 1
+            read_lengths[len(seq)]+=1
+            if search_kmers(seq,rrna_sense_kmer_dict):
+                well_counts['rRNA_sense_counts'][well] += 1
+            if search_kmers(seq,rrna_antisense_kmer_dict):
+                well_counts['rRNA_antisense_counts'][well] += 1
+            if search_kmers(seq,mt_rrna_sense_kmer_dict):
+                well_counts['mt_rRNA_sense_counts'][well] += 1
+            if search_kmers(seq,mt_rrna_antisense_kmer_dict):
+                well_counts['mt_rRNA_antisense_counts'][well] += 1
+    read_len = max(read_lengths.keys())
+    read_len_trimmed = read_len - 30
+    tso_fraction = read_lengths[read_len_trimmed]/sum(read_lengths.values())
+    cols = ['rRNA_sense_counts','rRNA_antisense_counts','total_counts']
+    well_rrna_counts = pd.DataFrame(well_counts)[cols].loc[sub_wells+list(np.array(sub_wells)+48)]
+    well_rrna_counts_dt = pd.DataFrame(well_rrna_counts).loc[sub_wells]
+    well_rrna_counts_randhex = pd.DataFrame(well_rrna_counts).loc[list(np.array(sub_wells)+48)]
     well_rrna_fraction = (well_rrna_counts.T/well_rrna_counts.total_counts).T.iloc[:,:2]
+    well_rrna_fraction_dt = (well_rrna_counts_dt.T/well_rrna_counts_dt.total_counts).T.iloc[:,:2]
+    well_rrna_fraction_randhex = (well_rrna_counts_randhex.T/well_rrna_counts_randhex.total_counts).T.iloc[:,:2]
     rrna_fraction = well_rrna_counts.sum(0).iloc[:2]/well_rrna_counts.sum(0).iloc[2]
+    rrna_fraction_dt = well_rrna_counts_dt.sum(0).iloc[:2]/well_rrna_counts_dt.sum(0).iloc[2]
+    rrna_fraction_randhex = well_rrna_counts_randhex.sum(0).iloc[:2]/well_rrna_counts_randhex.sum(0).iloc[2]
+    
+    cols = ['mt_rRNA_sense_counts','mt_rRNA_antisense_counts','total_counts']
+    well_mt_rrna_counts = pd.DataFrame(well_counts)[cols].loc[sub_wells+list(np.array(sub_wells)+48)]
+    well_mt_rrna_counts_dt = pd.DataFrame(well_mt_rrna_counts).loc[sub_wells]
+    well_mt_rrna_counts_randhex = pd.DataFrame(well_mt_rrna_counts).loc[list(np.array(sub_wells)+48)]
+    well_mt_rrna_fraction = (well_mt_rrna_counts.T/well_mt_rrna_counts.total_counts).T.iloc[:,:2]
+    well_mt_rrna_fraction_dt = (well_mt_rrna_counts_dt.T/well_mt_rrna_counts_dt.total_counts).T.iloc[:,:2]
+    well_mt_rrna_fraction_randhex = (well_mt_rrna_counts_randhex.T/well_mt_rrna_counts_randhex.total_counts).T.iloc[:,:2]
+    mt_rrna_fraction = well_mt_rrna_counts.sum(0).iloc[:2]/well_mt_rrna_counts.sum(0).iloc[2]
+    mt_rrna_fraction_dt = well_mt_rrna_counts_dt.sum(0).iloc[:2]/well_mt_rrna_counts_dt.sum(0).iloc[2]
+    mt_rrna_fraction_randhex = well_mt_rrna_counts_randhex.sum(0).iloc[:2]/well_mt_rrna_counts_randhex.sum(0).iloc[2]
     
     stat_dict = {}
     with open(output_dir + '/pipeline_stats.txt') as f:
@@ -375,17 +422,24 @@ def generate_single_dge_report(output_dir,genome_dir,chemistry,sample_name='',su
             k,v = line.split('\t')
             stat_dict[k] = int(v)
     stat_dict['Estimated Number of Cells'] = len(barcodes)
-    stat_dict['Mean Reads per Cell'] = (stat_dict['fastq_reads'] * df.shape[0]/total_reads)/len(barcodes)
+    stat_dict['Mean Reads/Cell'] = (stat_dict['fastq_reads'] * df.shape[0]/total_reads)/len(barcodes)
     stat_dict['Number of Reads'] = stat_dict['fastq_reads'] * df.shape[0]/total_reads
     stat_dict['Sequencing Saturation'] = 1-df.shape[0]/df.counts.sum()
     stat_dict['Valid Barcode Fraction'] = stat_dict['fastq_valid_barcode_reads']/stat_dict['fastq_reads']
     stat_dict['Reads Mapped to rRNA'] = rrna_fraction.iloc[:2].sum()
+    stat_dict['Reads Mapped to rRNA (dT)'] = rrna_fraction_dt.iloc[:2].sum()
+    stat_dict['Reads Mapped to rRNA (randhex)'] = rrna_fraction_randhex.iloc[:2].sum()
+    stat_dict['Reads Mapped to mt-rRNA'] = mt_rrna_fraction.iloc[:2].sum()
+    stat_dict['Reads Mapped to mt-rRNA (dT)'] = mt_rrna_fraction_dt.iloc[:2].sum()
+    stat_dict['Reads Mapped to mt-rRNA (randhex)'] = mt_rrna_fraction_randhex.iloc[:2].sum()
+    stat_dict['TSO Fraction in Read1'] = tso_fraction
     stat_dict['Reads Mapped to Transcriptome'] = stat_dict['mapped_to_transcriptome']/stat_dict['fastq_valid_barcode_reads']
     for s in species:
         stat_dict['%s Fraction Reads in Cells' %s] = digital_count_matrix[:,species_gene_inds[s]].sum()/\
                                                      df.query('genome=="%s"' %s, engine='python').shape[0]
-        stat_dict['%s Median UMIs per Cell' %s] = np.median(species_umi_counts[s].iloc[np.where(species_assignments==s)])
-        stat_dict['%s Median Genes per Cell' %s] = np.median(species_gene_counts[s].iloc[np.where(species_assignments==s)])
+        stat_dict['%s Median UMIs/Cell' %s] = np.median(species_umi_counts[s].iloc[np.where(species_assignments==s)])
+        stat_dict['%s Median UMIs/Cell @50%% Dup' %s]  = stat_dict['%s Median UMIs/Cell' %s] * 0.5 /stat_dict['Sequencing Saturation']
+        stat_dict['%s Median Genes/Cell' %s] = np.median(species_gene_counts[s].iloc[np.where(species_assignments==s)])
         stat_dict['%s Number of Cells Detected' %s] = sum(species_assignments==s)
         stat_dict['%s Exonic Fraction' %s] = df.loc[np.where(df.cell_barcode.isin(barcodes).values)].query('genome=="%s"' %s).exonic.mean()
         stat_dict['%s dT Fraction' %s] = (df.loc[np.where(df.cell_barcode.isin(barcodes).values)]\
@@ -397,14 +451,22 @@ def generate_single_dge_report(output_dir,genome_dir,chemistry,sample_name='',su
     for s in species:
         stat_catagories.append('%s Number of Cells Detected' %s)
     for s in species:
-        stat_catagories.append('%s Median UMIs per Cell' %s)
+        stat_catagories.append('%s Median UMIs/Cell' %s)    
     for s in species:
-        stat_catagories.append('%s Median Genes per Cell' %s)
-    stat_catagories += ['Mean Reads per Cell',
+        stat_catagories.append('%s Median UMIs/Cell @50%% Dup' %s)
+    for s in species:
+        stat_catagories.append('%s Median Genes/Cell' %s)
+    stat_catagories += ['Mean Reads/Cell',
                         'Number of Reads',
                         'Sequencing Saturation',
                         'Valid Barcode Fraction',
                         'Reads Mapped to rRNA',
+                        'Reads Mapped to rRNA (dT)',
+                        'Reads Mapped to rRNA (randhex)',
+                        'Reads Mapped to mt-rRNA',
+                        'Reads Mapped to mt-rRNA (dT)',
+                        'Reads Mapped to mt-rRNA (randhex)',
+                        'TSO Fraction in Read1',
                         'Reads Mapped to Transcriptome',
                         'Fraction Reads in Cells'
                        ]
@@ -416,12 +478,15 @@ def generate_single_dge_report(output_dir,genome_dir,chemistry,sample_name='',su
         stat_catagories.append('%s Exonic Fraction' %s)
     for s in species:
         stat_catagories.append('%s dT Fraction' %s)
-
+    
+    # Save summary stats to csv
+    pd.Series(stat_dict).loc[stat_catagories].to_csv(output_dir + '/analysis_summary.csv')
+    
     # Subsample reads
     species_read_proportions = df.groupby('genome').size()/df.groupby('genome').size().sum()
     gene_counts_subsampled_df = {}
     umi_counts_subsampled_df = {}
-    for s in df.genome.unique():
+    for s in species:
         seq_depth = species_read_proportions[s] * \
                     stat_dict['Number of Reads']/stat_dict['%s Number of Cells Detected' %s]
         gene_counts_subsampled = {0:0}
@@ -435,13 +500,21 @@ def generate_single_dge_report(output_dir,genome_dir,chemistry,sample_name='',su
             gene_counts_subsampled[subsample] = (species_df[sub_sampled_counts>0]
                                                         .groupby('cell_barcode')
                                                         .gene.apply(lambda x:len(np.unique(x)))
-                                                        .loc[barcodes[np.where(species_assignments==s)]]).median()
+                                                        .reindex(barcodes[np.where(species_assignments==s)])).median()
             umi_counts_subsampled[subsample] = (species_df[sub_sampled_counts>0]
                                                         .groupby('cell_barcode')
                                                         .umi.size()
-                                                        .loc[barcodes[np.where(species_assignments==s)]]).median()
+                                                        .reindex(barcodes[np.where(species_assignments==s)])).median()
         gene_counts_subsampled_df[s] = pd.Series(gene_counts_subsampled).fillna(0)
         umi_counts_subsampled_df[s] = pd.Series(umi_counts_subsampled).fillna(0)
+        
+    # Get UMIs by well:
+    umi_counts_by_rnd1_well = cell_df.groupby('rnd1_well').umi_count.median().reindex(range(48)).fillna(0)
+    umi_counts_by_rnd2_well = cell_df.groupby('rnd2_well').umi_count.median().reindex(range(96)).fillna(0)
+    umi_counts_by_rnd3_well = cell_df.groupby('rnd3_well').umi_count.median().reindex(range(96)).fillna(0)
+    cell_counts_by_rnd1_well = cell_df.groupby('rnd1_well').size().reindex(range(48)).fillna(0)
+    cell_counts_by_rnd2_well = cell_df.groupby('rnd2_well').size().reindex(range(96)).fillna(0)
+    cell_counts_by_rnd3_well = cell_df.groupby('rnd3_well').size().reindex(range(96)).fillna(0)
 
     # Generate summary PDF
     fig = plt.figure(figsize=(8,8))
@@ -449,10 +522,10 @@ def generate_single_dge_report(output_dir,genome_dir,chemistry,sample_name='',su
     h = 1
     c =0
     for k in stat_catagories:
-        if c<9:
-            text2write = k+' '*int((32-len(k)))+str(int(np.round(stat_dict[k])))
+        if c<11:
+            text2write = k+' '*int((34-len(k)))+str(int(np.round(stat_dict[k])))
         else:
-            text2write = k+' '*int((32-len(k)))+'%0.3f' %stat_dict[k]
+            text2write = k+' '*int((34-len(k)))+'%0.3f' %stat_dict[k]
         ax.text(-0.13,h,text2write,fontdict={'family':'monospace'},fontsize=11)
         h-=0.055
         c+=1
@@ -465,17 +538,72 @@ def generate_single_dge_report(output_dir,genome_dir,chemistry,sample_name='',su
         ax = fig.add_axes([1,0.65,0.35,0.35])
         _ = barnyard(species_umi_counts,ax=ax)
 
-    ax = fig.add_axes([0.0,0.05,0.6,0.4])
+    ax = fig.add_axes([0.5,0.1,0.35,0.35])
     for s in species:
         gene_counts_subsampled_df[s].plot(label=s,ax=ax)
     ax.legend()
     ax.set_title('Median Genes per Cell')
     ax.set_xlabel('Sequencing Reads per Cell')
 
-    ax = fig.add_axes([0.75,0.05,0.6,0.4])
+    ax = fig.add_axes([1,0.1,0.35,0.35])
     for s in species:
         umi_counts_subsampled_df[s].plot(label=s,ax=ax)
     ax.legend()
     ax.set_title('Median UMIs per Cell')
     ax.set_xlabel('Sequencing Reads per Cell')
+    
+    fig.add_axes([0,-0.16,0.35,0.2])
+    cm = plt.imshow(umi_counts_by_rnd1_well.values.reshape(4,12),cmap=plt.cm.Reds)
+    plt.gca().set_xticks(range(0,12))
+    plt.gca().set_xticklabels(range(1,13))
+    plt.gca().set_yticks(range(0,4))
+    plt.gca().set_yticklabels(list('ABCD'))
+    plt.gca().set_title('Round1: Median UMIs per Well')
+    plt.colorbar(cm,pad=0.02,aspect=10,shrink=0.7)
+    
+    fig.add_axes([0.5,-0.2,0.35,0.2])
+    cm = plt.imshow(umi_counts_by_rnd2_well.values.reshape(8,12),cmap=plt.cm.Reds)
+    plt.gca().set_xticks(range(0,12))
+    plt.gca().set_xticklabels(range(1,13))
+    plt.gca().set_yticks(range(0,8))
+    plt.gca().set_yticklabels(list('ABCDEFGH'))
+    plt.gca().set_title('Round2: Median UMIs per Well')
+    plt.colorbar(cm,pad=0.02,aspect=10,shrink=0.7)
+    
+    fig.add_axes([1,-0.2,0.35,0.2])
+    cm = plt.imshow(umi_counts_by_rnd3_well.values.reshape(8,12),cmap=plt.cm.Reds)
+    plt.gca().set_xticks(range(0,12))
+    plt.gca().set_xticklabels(range(1,13))
+    plt.gca().set_yticks(range(0,8))
+    plt.gca().set_yticklabels(list('ABCDEFGH'))
+    plt.gca().set_title('Round3: Median UMIs per Well')
+    plt.colorbar(cm,pad=0.02,aspect=10,shrink=0.7)
+    
+    fig.add_axes([0,-0.43,0.35,0.2])
+    cm = plt.imshow(cell_counts_by_rnd1_well.values.reshape(4,12),cmap=plt.cm.Reds)
+    plt.gca().set_xticks(range(0,12))
+    plt.gca().set_xticklabels(range(1,13))
+    plt.gca().set_yticks(range(0,4))
+    plt.gca().set_yticklabels(list('ABCD'))
+    plt.gca().set_title('Round1: Cells per Well')
+    plt.colorbar(cm,pad=0.02,aspect=10,shrink=0.7)
+    
+    fig.add_axes([0.5,-0.47,0.35,0.2])
+    cm = plt.imshow(cell_counts_by_rnd2_well.values.reshape(8,12),cmap=plt.cm.Reds)
+    plt.gca().set_xticks(range(0,12))
+    plt.gca().set_xticklabels(range(1,13))
+    plt.gca().set_yticks(range(0,8))
+    plt.gca().set_yticklabels(list('ABCDEFGH'))
+    plt.gca().set_title('Round2: Cells per Well')
+    plt.colorbar(cm,pad=0.02,aspect=10,shrink=0.7)
+    
+    fig.add_axes([1,-0.47,0.35,0.2])
+    cm = plt.imshow(cell_counts_by_rnd3_well.values.reshape(8,12),cmap=plt.cm.Reds)
+    plt.gca().set_xticks(range(0,12))
+    plt.gca().set_xticklabels(range(1,13))
+    plt.gca().set_yticks(range(0,8))
+    plt.gca().set_yticklabels(list('ABCDEFGH'))
+    plt.gca().set_title('Round3: Cells per Well')
+    plt.colorbar(cm,pad=0.02,aspect=10,shrink=0.7)
+    
     fig.savefig(output_dir +'/' + sample_name + 'analysis_summary.pdf',bbox_inches='tight')
