@@ -1,9 +1,11 @@
 import pandas as pd
 import scipy.io as sio
+import scipy.interpolate
 import numpy as np
 import scipy.sparse
 import scipy
 import gzip
+import subprocess
 import collections
 from collections import defaultdict, Counter
 import scipy.sparse as sp_sparse
@@ -200,7 +202,7 @@ def generate_all_dge_reports(output_dir, genome_dir, chemistry, samples):
     
     # gzip fastq file to save space
     if not ('single_cells_barcoded_head.fastq.gz' in os.listdir(output_dir)):
-        gzip_command = """gzip {0}/single_cells_barcoded_head.fastq""".format{output_dir}
+        gzip_command = """gzip {0}/single_cells_barcoded_head.fastq""".format(output_dir)
         rc = subprocess.call(gzip_command, shell=True)
 
 def generate_single_dge_report(output_dir,genome_dir,chemistry,sample_name='',sub_wells=None, read_thresh=None):

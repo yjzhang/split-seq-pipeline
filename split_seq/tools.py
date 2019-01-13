@@ -351,7 +351,7 @@ def preprocess_fastq(fastq1, fastq2, output_dir, chemistry='v1', **params):
     
     fastq_reads = 0
     fastq_valid_barcode_reads = 0
-    with gzip.open(fastq1,'rb') as f1, gzip.open(fastq2,'rb') as f2, open(output_dir + 'single_cells_barcoded_head.fastq','w') as fout:
+    with gzip.open(fastq1,'rb') as f1, gzip.open(fastq2,'rb') as f2, open(output_dir + '/single_cells_barcoded_head.fastq','w') as fout:
         while True:
             header2 = f2.readline()
             if len(header2)==0:
