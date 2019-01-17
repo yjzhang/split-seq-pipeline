@@ -1,9 +1,11 @@
 import pandas as pd
 import scipy.io as sio
+import scipy.interpolate
 import numpy as np
 import scipy.sparse
 import scipy
 import gzip
+import subprocess
 import collections
 from collections import defaultdict, Counter
 import scipy.sparse as sp_sparse
@@ -197,6 +199,11 @@ def generate_all_dge_reports(output_dir, genome_dir, chemistry, samples):
             generate_single_dge_report(output_dir,genome_dir,chemistry,sample_name=sample_name,sub_wells=sub_wells)
     else:
         generate_single_dge_report(output_dir,genome_dir,chemistry)
+    
+    # gzip fastq file to save space
+    if not ('single_cells_barcoded_head.fastq.gz' in os.listdir(output_dir)):
+        gzip_command = """gzip {0}/single_cells_barcoded_head.fastq""".format(output_dir)
+        rc = subprocess.call(gzip_command, shell=True)
 
 def generate_single_dge_report(output_dir,genome_dir,chemistry,sample_name='',sub_wells=None, read_thresh=None):
     
@@ -392,9 +399,9 @@ def generate_single_dge_report(output_dir,genome_dir,chemistry,sample_name='',su
     read_len_trimmed = read_len - 30
     tso_fraction = read_lengths[read_len_trimmed]/sum(read_lengths.values())
     cols = ['rRNA_sense_counts','rRNA_antisense_counts','total_counts']
-    well_rrna_counts = pd.DataFrame(well_counts)[cols].loc[sub_wells+list(np.array(sub_wells)+48)]
-    well_rrna_counts_dt = pd.DataFrame(well_rrna_counts).loc[sub_wells]
-    well_rrna_counts_randhex = pd.DataFrame(well_rrna_counts).loc[list(np.array(sub_wells)+48)]
+    well_rrna_counts = pd.DataFrame(well_counts)[cols].reindex([sub_wells+list(np.array(sub_wells)+48)])
+    well_rrna_counts_dt = pd.DataFrame(well_rrna_counts).reindex([sub_wells])
+    well_rrna_counts_randhex = pd.DataFrame(well_rrna_counts).reindex([list(np.array(sub_wells)+48)])
     well_rrna_fraction = (well_rrna_counts.T/well_rrna_counts.total_counts).T.iloc[:,:2]
     well_rrna_fraction_dt = (well_rrna_counts_dt.T/well_rrna_counts_dt.total_counts).T.iloc[:,:2]
     well_rrna_fraction_randhex = (well_rrna_counts_randhex.T/well_rrna_counts_randhex.total_counts).T.iloc[:,:2]
@@ -522,7 +529,7 @@ def generate_single_dge_report(output_dir,genome_dir,chemistry,sample_name='',su
     h = 1
     c =0
     for k in stat_catagories:
-        if c<11:
+        if c < (4*len(species)+2):
             text2write = k+' '*int((34-len(k)))+str(int(np.round(stat_dict[k])))
         else:
             text2write = k+' '*int((34-len(k)))+'%0.3f' %stat_dict[k]

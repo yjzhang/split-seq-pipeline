@@ -285,7 +285,7 @@ def molecule_info_chunk(transcriptome_dir, output_dir, chunk=None, gtf_dict_step
     samfile.close()
 
 def join_read_assignment_files(output_dir, nthreads):
-    filenames = [output_dir + 'read_assignment.chunk%d.csv' %i for i in range(1,nthreads+1)]
+    filenames = [output_dir + '/read_assignment.chunk%d.csv' %i for i in range(1,nthreads+1)]
     with open(output_dir + '/read_assignment.csv', 'w') as outfile:
         # Write header
         outfile.write('cell_barcode,genome,gene,gene_name,umi,counts,exonic\n')

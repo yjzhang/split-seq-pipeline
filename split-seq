@@ -105,7 +105,7 @@ if mode == 'all':
 if mode == 'preproc' or mode == 'preprocess' or mode == 'preprocessing':
     tools.preprocess_fastq(args.fq1, args.fq2, args.output_dir, args.chemistry)
 if mode == 'star':
-    tools.run_star(args.genome_dir, args.output_dir)
+    tools.run_star(args.genome_dir, args.output_dir, args.nthreads)
 if mode == 'postproc' or mode == 'postprocess' or mode == 'postprocessing':
     tools.sort_sam(args.output_dir, args.nthreads)
 if mode == 'molinfo':
