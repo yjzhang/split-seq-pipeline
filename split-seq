@@ -34,7 +34,7 @@ parser.add_argument('--fq2', help='fastq2 - reads contain UMI and barcodes')
 parser.add_argument('--output_dir', help='output dir')
 parser.add_argument('--chemistry', default='v1', help='Using v1 or v2 chemistry')
 parser.add_argument('--genome_dir', default='./', help='path containing reference genome')
-parser.add_argument('--sample', action='append', nargs=2, metavar=('SAMPLE_NAME','WELLS'),
+parser.add_argument('--sample', action='append', default=[], nargs=2, metavar=('SAMPLE_NAME','WELLS'),
                      help='Add a sample_name followed by the range of wells. A1:B6 specifies A1:A6,B1:B6,C1:C6. A1-B6 specifies A1-A12,B1-6. Multiple selections can be made by adding a comma (no space), e.g. A1-A6,B1-B3')
 # TODO: this is currently unused
 #parser.add_argument('--star_path', default='./', help='path containing STAR')

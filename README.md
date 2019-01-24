@@ -55,9 +55,9 @@ split-seq all --fq1 input_R1.fastq.gz \
               --output_dir <output_dir> \
               --chemistry v2 \
               --genome_dir <path_to_ref>/hg38_mm10/ \
-              --nthreads 16
-              --sample sample_name1 A1:B6
-              --sample sample_name2 A7:B12
-              --sample sample_name3 C1:D6
+              --nthreads 16 \
+              --sample sample_name1 A1:B6 \
+              --sample sample_name2 A7:B12 \
+              --sample sample_name3 C1:D6 \
               --sample sample_name4 C7:D12
 ~~~~
