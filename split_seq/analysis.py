@@ -191,21 +191,21 @@ def check_valid_samples(samples):
                 return False
     return True
  
-def generate_all_dge_reports(output_dir, genome_dir, chemistry, samples):
+def generate_all_dge_reports(output_dir, genome_dir, chemistry, samples, sublibraries=None):
     if len(samples)>0:
         for i in range(len(samples)):
             sample_name = samples[i][0]
             sub_wells = parse_wells(samples[i][1])
-            generate_single_dge_report(output_dir,genome_dir,chemistry,sample_name=sample_name,sub_wells=sub_wells)
+            generate_single_dge_report(output_dir,genome_dir,chemistry,sample_name=sample_name,sub_wells=sub_wells,sublibraries=sublibraries)
     else:
-        generate_single_dge_report(output_dir,genome_dir,chemistry)
+        generate_single_dge_report(output_dir,genome_dir,chemistry,sublibraries=sublibraries)
     
     # gzip fastq file to save space
-    if not ('single_cells_barcoded_head.fastq.gz' in os.listdir(output_dir)):
+    if (not ('single_cells_barcoded_head.fastq.gz' in os.listdir(output_dir))) and (sublibraries is None):
         gzip_command = """gzip {0}/single_cells_barcoded_head.fastq""".format(output_dir)
         rc = subprocess.call(gzip_command, shell=True)
 
-def generate_single_dge_report(output_dir,genome_dir,chemistry,sample_name='',sub_wells=None, read_thresh=None):
+def generate_single_dge_report(output_dir,genome_dir,chemistry,sample_name='',sub_wells=None, read_thresh=None, sublibraries=None):
     
     # Load gene_info dictionary to assign genes to reads
     with open(genome_dir +'/gene_info.pkl', 'rb') as f:
@@ -233,11 +233,26 @@ def generate_single_dge_report(output_dir,genome_dir,chemistry,sample_name='',su
     bc_to_well_lig = dict(zip(bc_8nt_lig.values,range(96)))
 
     # Load the read_assignment file
-    df = pd.read_csv(output_dir + '/read_assignment.csv')
-    total_reads = df.shape[0]
-    df['rt_type'] = df.cell_barcode.apply(lambda s:bc_8nt_randhex_dt_dict[s[16:24]])
-    df['cell_barcode'] = df.cell_barcode.apply(lambda s:s[:16]+'_'+str(bc_8nt_dict[s[16:24]]))
-    df['well'] = df.cell_barcode.apply(lambda s: int(s.split('_')[-1]))
+    if sublibraries is None:
+        df = pd.read_csv(output_dir + '/read_assignment.csv')
+        total_reads = df.shape[0]
+        df['rt_type'] = df.cell_barcode.apply(lambda s:bc_8nt_randhex_dt_dict[s[16:24]])
+        df['cell_barcode'] = df.cell_barcode.apply(lambda s:s[:16]+'_'+str(bc_8nt_dict[s[16:24]]))
+        df['well'] = df.cell_barcode.apply(lambda s: int(s.split('_')[-1]))
+    else:
+        if not os.path.exists(output_dir):
+            os.makedirs(output_dir)
+        df = []
+        i = 1
+        for cur_dir in sublibraries:
+            df.append(pd.read_csv(cur_dir + '/read_assignment.csv'))
+            df[-1]['rt_type'] = df[-1].cell_barcode.apply(lambda s:bc_8nt_randhex_dt_dict[s[16:24]])
+            df[-1]['cell_barcode'] = df[-1].cell_barcode.apply(lambda s:s[:16]+'_'+str(bc_8nt_dict[s[16:24]]))
+            df[-1]['well'] = df[-1].cell_barcode.apply(lambda s: int(s.split('_')[-1]))
+            df[-1]['cell_barcode'] = df[-1]['cell_barcode'] + '_s' + str(i)
+            i+=1
+        df = pd.concat(df)
+        total_reads = df.shape[0]
     
     
     # Check if performing analysis on a subset of wells
@@ -277,7 +292,7 @@ def generate_single_dge_report(output_dir,genome_dir,chemistry,sample_name='',su
     cell_df = pd.DataFrame()
     cell_df['cell_barcode'] = pd.Series(barcodes)
     cell_df['species'] = species_assignments.values
-    cell_df['rnd1_well'] = pd.Series(barcodes).apply(lambda s: int(s.split('_')[-1]))
+    cell_df['rnd1_well'] = pd.Series(barcodes).apply(lambda s: int(s.split('_')[1]))
     cell_df['rnd2_well'] = pd.Series(barcodes).apply(lambda s: bc_to_well_lig[s[8:16]])
     cell_df['rnd3_well'] = pd.Series(barcodes).apply(lambda s: bc_to_well_lig[s[:8]])
     cell_df['umi_count'] = np.array(digital_count_matrix.sum(1)).flatten()
@@ -329,130 +344,146 @@ def generate_single_dge_report(output_dir,genome_dir,chemistry,sample_name='',su
         species_assignments.loc[np.where((species_umi_counts[s]/species_umi_counts.sum(1))>0.9)] = s
     species = np.unique(species_assignments.values)
     species = species[species!='multiplet']
- 
-    # Calculate rRNA Percentage:
-    kmer_len = 30
-    rrna_sense_kmer_dict = {}
-    rrna_antisense_kmer_dict = {}
-    with open('/home/ubuntu/split-seq-pipeline/split_seq/rRNA.fa') as f:
-        while True:
-            line = f.readline()[:-1]
-            if len(line)==0:
-                break
-            if line[0]!='>':
-                for i in range(len(line)-kmer_len):
-                    kmer = line[i:i+kmer_len]
-                    rrna_sense_kmer_dict[kmer] = 0
-                line = reverse_complement(line)
-                for i in range(len(line)-kmer_len):
-                    kmer = line[i:i+kmer_len]
-                    rrna_antisense_kmer_dict[kmer] = 0
     
-    kmer_len = 30
-    mt_rrna_sense_kmer_dict = {}
-    mt_rrna_antisense_kmer_dict = {}
-    with open('/home/ubuntu/split-seq-pipeline/split_seq/mt_rRNA.fa') as f:
-        while True:
-            line = f.readline()[:-1]
-            if len(line)==0:
-                break
-            if line[0]!='>':
-                for i in range(len(line)-kmer_len):
-                    kmer = line[i:i+kmer_len]
-                    mt_rrna_sense_kmer_dict[kmer] = 0
-                line = reverse_complement(line)
-                for i in range(len(line)-kmer_len):
-                    kmer = line[i:i+kmer_len]
-                    mt_rrna_antisense_kmer_dict[kmer] = 0
+    if sublibraries is None:
+        # Calculate rRNA Percentage:
+        kmer_len = 30
+        rrna_sense_kmer_dict = {}
+        rrna_antisense_kmer_dict = {}
+        with open('/home/ubuntu/split-seq-pipeline/split_seq/rRNA.fa') as f:
+            while True:
+                line = f.readline()[:-1]
+                if len(line)==0:
+                    break
+                if line[0]!='>':
+                    for i in range(len(line)-kmer_len):
+                        kmer = line[i:i+kmer_len]
+                        rrna_sense_kmer_dict[kmer] = 0
+                    line = reverse_complement(line)
+                    for i in range(len(line)-kmer_len):
+                        kmer = line[i:i+kmer_len]
+                        rrna_antisense_kmer_dict[kmer] = 0
+        
+        kmer_len = 30
+        mt_rrna_sense_kmer_dict = {}
+        mt_rrna_antisense_kmer_dict = {}
+        with open('/home/ubuntu/split-seq-pipeline/split_seq/mt_rRNA.fa') as f:
+            while True:
+                line = f.readline()[:-1]
+                if len(line)==0:
+                    break
+                if line[0]!='>':
+                    for i in range(len(line)-kmer_len):
+                        kmer = line[i:i+kmer_len]
+                        mt_rrna_sense_kmer_dict[kmer] = 0
+                    line = reverse_complement(line)
+                    for i in range(len(line)-kmer_len):
+                        kmer = line[i:i+kmer_len]
+                        mt_rrna_antisense_kmer_dict[kmer] = 0
 
-    def search_kmers(seq,kmer_dict):
-        found = False
-        for i in range(0,41,10):
-            try:
-                kmer_dict[seq[i:i+kmer_len]]
-                found = True
-            except:
-                pass
-        return found
-    
-    fastqfile = output_dir + '/single_cells_barcoded_head.fastq'
-    well_counts = defaultdict(Counter)
-    read_lengths = Counter()
-    with open(fastqfile) as f:
-        for i in range(1000000):
-            header = f.readline()
-            seq = f.readline()[:-1]
-            f.readline()
-            f.readline()
-            well = bc_to_well[header[17:17+8]]
-            well_counts['total_counts'][well] += 1
-            read_lengths[len(seq)]+=1
-            if search_kmers(seq,rrna_sense_kmer_dict):
-                well_counts['rRNA_sense_counts'][well] += 1
-            if search_kmers(seq,rrna_antisense_kmer_dict):
-                well_counts['rRNA_antisense_counts'][well] += 1
-            if search_kmers(seq,mt_rrna_sense_kmer_dict):
-                well_counts['mt_rRNA_sense_counts'][well] += 1
-            if search_kmers(seq,mt_rrna_antisense_kmer_dict):
-                well_counts['mt_rRNA_antisense_counts'][well] += 1
-    read_len = max(read_lengths.keys())
-    read_len_trimmed = read_len - 30
-    tso_fraction = read_lengths[read_len_trimmed]/sum(read_lengths.values())
-    cols = ['rRNA_sense_counts','rRNA_antisense_counts','total_counts']
-    well_rrna_counts = pd.DataFrame(well_counts)[cols].reindex([sub_wells+list(np.array(sub_wells)+48)])
-    well_rrna_counts_dt = pd.DataFrame(well_rrna_counts).reindex([sub_wells])
-    well_rrna_counts_randhex = pd.DataFrame(well_rrna_counts).reindex([list(np.array(sub_wells)+48)])
-    well_rrna_fraction = (well_rrna_counts.T/well_rrna_counts.total_counts).T.iloc[:,:2]
-    well_rrna_fraction_dt = (well_rrna_counts_dt.T/well_rrna_counts_dt.total_counts).T.iloc[:,:2]
-    well_rrna_fraction_randhex = (well_rrna_counts_randhex.T/well_rrna_counts_randhex.total_counts).T.iloc[:,:2]
-    rrna_fraction = well_rrna_counts.sum(0).iloc[:2]/well_rrna_counts.sum(0).iloc[2]
-    rrna_fraction_dt = well_rrna_counts_dt.sum(0).iloc[:2]/well_rrna_counts_dt.sum(0).iloc[2]
-    rrna_fraction_randhex = well_rrna_counts_randhex.sum(0).iloc[:2]/well_rrna_counts_randhex.sum(0).iloc[2]
-    
-    cols = ['mt_rRNA_sense_counts','mt_rRNA_antisense_counts','total_counts']
-    well_mt_rrna_counts = pd.DataFrame(well_counts)[cols].loc[sub_wells+list(np.array(sub_wells)+48)]
-    well_mt_rrna_counts_dt = pd.DataFrame(well_mt_rrna_counts).loc[sub_wells]
-    well_mt_rrna_counts_randhex = pd.DataFrame(well_mt_rrna_counts).loc[list(np.array(sub_wells)+48)]
-    well_mt_rrna_fraction = (well_mt_rrna_counts.T/well_mt_rrna_counts.total_counts).T.iloc[:,:2]
-    well_mt_rrna_fraction_dt = (well_mt_rrna_counts_dt.T/well_mt_rrna_counts_dt.total_counts).T.iloc[:,:2]
-    well_mt_rrna_fraction_randhex = (well_mt_rrna_counts_randhex.T/well_mt_rrna_counts_randhex.total_counts).T.iloc[:,:2]
-    mt_rrna_fraction = well_mt_rrna_counts.sum(0).iloc[:2]/well_mt_rrna_counts.sum(0).iloc[2]
-    mt_rrna_fraction_dt = well_mt_rrna_counts_dt.sum(0).iloc[:2]/well_mt_rrna_counts_dt.sum(0).iloc[2]
-    mt_rrna_fraction_randhex = well_mt_rrna_counts_randhex.sum(0).iloc[:2]/well_mt_rrna_counts_randhex.sum(0).iloc[2]
-    
-    stat_dict = {}
-    with open(output_dir + '/pipeline_stats.txt') as f:
-        while True:
-            line = f.readline()[:-1]
-            if len(line)==0:
-                break
-            k,v = line.split('\t')
-            stat_dict[k] = int(v)
-    stat_dict['Estimated Number of Cells'] = len(barcodes)
-    stat_dict['Mean Reads/Cell'] = (stat_dict['fastq_reads'] * df.shape[0]/total_reads)/len(barcodes)
-    stat_dict['Number of Reads'] = stat_dict['fastq_reads'] * df.shape[0]/total_reads
-    stat_dict['Sequencing Saturation'] = 1-df.shape[0]/df.counts.sum()
-    stat_dict['Valid Barcode Fraction'] = stat_dict['fastq_valid_barcode_reads']/stat_dict['fastq_reads']
-    stat_dict['Reads Mapped to rRNA'] = rrna_fraction.iloc[:2].sum()
-    stat_dict['Reads Mapped to rRNA (dT)'] = rrna_fraction_dt.iloc[:2].sum()
-    stat_dict['Reads Mapped to rRNA (randhex)'] = rrna_fraction_randhex.iloc[:2].sum()
-    stat_dict['Reads Mapped to mt-rRNA'] = mt_rrna_fraction.iloc[:2].sum()
-    stat_dict['Reads Mapped to mt-rRNA (dT)'] = mt_rrna_fraction_dt.iloc[:2].sum()
-    stat_dict['Reads Mapped to mt-rRNA (randhex)'] = mt_rrna_fraction_randhex.iloc[:2].sum()
-    stat_dict['TSO Fraction in Read1'] = tso_fraction
-    stat_dict['Reads Mapped to Transcriptome'] = stat_dict['mapped_to_transcriptome']/stat_dict['fastq_valid_barcode_reads']
-    for s in species:
-        stat_dict['%s Fraction Reads in Cells' %s] = digital_count_matrix[:,species_gene_inds[s]].sum()/\
-                                                     df.query('genome=="%s"' %s, engine='python').shape[0]
-        stat_dict['%s Median UMIs/Cell' %s] = np.median(species_umi_counts[s].iloc[np.where(species_assignments==s)])
-        stat_dict['%s Median UMIs/Cell @50%% Dup' %s]  = stat_dict['%s Median UMIs/Cell' %s] * 0.5 /stat_dict['Sequencing Saturation']
-        stat_dict['%s Median Genes/Cell' %s] = np.median(species_gene_counts[s].iloc[np.where(species_assignments==s)])
-        stat_dict['%s Number of Cells Detected' %s] = sum(species_assignments==s)
-        stat_dict['%s Exonic Fraction' %s] = df.loc[np.where(df.cell_barcode.isin(barcodes).values)].query('genome=="%s"' %s).exonic.mean()
-        stat_dict['%s dT Fraction' %s] = (df.loc[np.where(df.cell_barcode.isin(barcodes).values)]\
-                                           .query('genome=="%s"' %s)\
-                                           .rt_type=='dt').mean()
-    stat_dict['Fraction Reads in Cells'] = digital_count_matrix.sum()/df.shape[0]
+        def search_kmers(seq,kmer_dict):
+            found = False
+            for i in range(0,41,10):
+                try:
+                    kmer_dict[seq[i:i+kmer_len]]
+                    found = True
+                except:
+                    pass
+            return found
+        
+        fastqfile = output_dir + '/single_cells_barcoded_head.fastq'
+        well_counts = defaultdict(Counter)
+        read_lengths = Counter()
+        with open(fastqfile) as f:
+            for i in range(1000000):
+                header = f.readline()
+                seq = f.readline()[:-1]
+                f.readline()
+                f.readline()
+                well = bc_to_well[header[17:17+8]]
+                well_counts['total_counts'][well] += 1
+                read_lengths[len(seq)]+=1
+                if search_kmers(seq,rrna_sense_kmer_dict):
+                    well_counts['rRNA_sense_counts'][well] += 1
+                if search_kmers(seq,rrna_antisense_kmer_dict):
+                    well_counts['rRNA_antisense_counts'][well] += 1
+                if search_kmers(seq,mt_rrna_sense_kmer_dict):
+                    well_counts['mt_rRNA_sense_counts'][well] += 1
+                if search_kmers(seq,mt_rrna_antisense_kmer_dict):
+                    well_counts['mt_rRNA_antisense_counts'][well] += 1
+        read_len = max(read_lengths.keys())
+        read_len_trimmed = read_len - 30
+        tso_fraction = read_lengths[read_len_trimmed]/sum(read_lengths.values())
+        cols = ['rRNA_sense_counts','rRNA_antisense_counts','total_counts']
+        well_rrna_counts = pd.DataFrame(well_counts)[cols].reindex([sub_wells+list(np.array(sub_wells)+48)])
+        well_rrna_counts_dt = pd.DataFrame(well_rrna_counts).reindex([sub_wells])
+        well_rrna_counts_randhex = pd.DataFrame(well_rrna_counts).reindex([list(np.array(sub_wells)+48)])
+        well_rrna_fraction = (well_rrna_counts.T/well_rrna_counts.total_counts).T.iloc[:,:2]
+        well_rrna_fraction_dt = (well_rrna_counts_dt.T/well_rrna_counts_dt.total_counts).T.iloc[:,:2]
+        well_rrna_fraction_randhex = (well_rrna_counts_randhex.T/well_rrna_counts_randhex.total_counts).T.iloc[:,:2]
+        rrna_fraction = well_rrna_counts.sum(0).iloc[:2]/well_rrna_counts.sum(0).iloc[2]
+        rrna_fraction_dt = well_rrna_counts_dt.sum(0).iloc[:2]/well_rrna_counts_dt.sum(0).iloc[2]
+        rrna_fraction_randhex = well_rrna_counts_randhex.sum(0).iloc[:2]/well_rrna_counts_randhex.sum(0).iloc[2]
+        
+        cols = ['mt_rRNA_sense_counts','mt_rRNA_antisense_counts','total_counts']
+        well_mt_rrna_counts = pd.DataFrame(well_counts)[cols].loc[sub_wells+list(np.array(sub_wells)+48)]
+        well_mt_rrna_counts_dt = pd.DataFrame(well_mt_rrna_counts).loc[sub_wells]
+        well_mt_rrna_counts_randhex = pd.DataFrame(well_mt_rrna_counts).loc[list(np.array(sub_wells)+48)]
+        well_mt_rrna_fraction = (well_mt_rrna_counts.T/well_mt_rrna_counts.total_counts).T.iloc[:,:2]
+        well_mt_rrna_fraction_dt = (well_mt_rrna_counts_dt.T/well_mt_rrna_counts_dt.total_counts).T.iloc[:,:2]
+        well_mt_rrna_fraction_randhex = (well_mt_rrna_counts_randhex.T/well_mt_rrna_counts_randhex.total_counts).T.iloc[:,:2]
+        mt_rrna_fraction = well_mt_rrna_counts.sum(0).iloc[:2]/well_mt_rrna_counts.sum(0).iloc[2]
+        mt_rrna_fraction_dt = well_mt_rrna_counts_dt.sum(0).iloc[:2]/well_mt_rrna_counts_dt.sum(0).iloc[2]
+        mt_rrna_fraction_randhex = well_mt_rrna_counts_randhex.sum(0).iloc[:2]/well_mt_rrna_counts_randhex.sum(0).iloc[2]
+        
+        stat_dict = {}
+        with open(output_dir + '/pipeline_stats.txt') as f:
+            while True:
+                line = f.readline()[:-1]
+                if len(line)==0:
+                    break
+                k,v = line.split('\t')
+                stat_dict[k] = int(v)
+        stat_dict['Estimated Number of Cells'] = len(barcodes)
+        stat_dict['Mean Reads/Cell'] = (stat_dict['fastq_reads'] * df.shape[0]/total_reads)/len(barcodes)
+        stat_dict['Number of Reads'] = stat_dict['fastq_reads'] * df.shape[0]/total_reads
+        stat_dict['Sequencing Saturation'] = 1-df.shape[0]/df.counts.sum()
+        stat_dict['Valid Barcode Fraction'] = stat_dict['fastq_valid_barcode_reads']/stat_dict['fastq_reads']
+        stat_dict['Reads Mapped to rRNA'] = rrna_fraction.iloc[:2].sum()
+        stat_dict['Reads Mapped to rRNA (dT)'] = rrna_fraction_dt.iloc[:2].sum()
+        stat_dict['Reads Mapped to rRNA (randhex)'] = rrna_fraction_randhex.iloc[:2].sum()
+        stat_dict['Reads Mapped to mt-rRNA'] = mt_rrna_fraction.iloc[:2].sum()
+        stat_dict['Reads Mapped to mt-rRNA (dT)'] = mt_rrna_fraction_dt.iloc[:2].sum()
+        stat_dict['Reads Mapped to mt-rRNA (randhex)'] = mt_rrna_fraction_randhex.iloc[:2].sum()
+        stat_dict['TSO Fraction in Read1'] = tso_fraction
+        stat_dict['Reads Mapped to Transcriptome'] = stat_dict['mapped_to_transcriptome']/stat_dict['fastq_valid_barcode_reads']
+        for s in species:
+            stat_dict['%s Fraction Reads in Cells' %s] = digital_count_matrix[:,species_gene_inds[s]].sum()/\
+                                                         df.query('genome=="%s"' %s, engine='python').shape[0]
+            stat_dict['%s Median UMIs/Cell' %s] = np.median(species_umi_counts[s].iloc[np.where(species_assignments==s)])
+            stat_dict['%s Median UMIs/Cell @50%% Dup' %s]  = stat_dict['%s Median UMIs/Cell' %s] * 0.5 /stat_dict['Sequencing Saturation']
+            stat_dict['%s Median Genes/Cell' %s] = np.median(species_gene_counts[s].iloc[np.where(species_assignments==s)])
+            stat_dict['%s Number of Cells Detected' %s] = sum(species_assignments==s)
+            stat_dict['%s Exonic Fraction' %s] = df.loc[np.where(df.cell_barcode.isin(barcodes).values)].query('genome=="%s"' %s).exonic.mean()
+            stat_dict['%s dT Fraction' %s] = (df.loc[np.where(df.cell_barcode.isin(barcodes).values)]\
+                                               .query('genome=="%s"' %s)\
+                                               .rt_type=='dt').mean()
+        stat_dict['Fraction Reads in Cells'] = digital_count_matrix.sum()/df.shape[0]
+    else:
+        stat_df = pd.concat([pd.read_csv(s +'/'+ sample_name + 'analysis_summary.csv',names=[s.split('/')[-2]]).T for s in sublibraries])
+        num_reads_col = np.where(stat_df.columns=='Number of Reads')[0][0]
+        stat_dict = ((stat_df.iloc[:,num_reads_col+1:].T*stat_df.iloc[:,num_reads_col]).sum(1)/stat_df.iloc[:,num_reads_col].sum()).T.to_dict()
+        stat_dict['Estimated Number of Cells'] = len(barcodes)
+        stat_dict['Mean Reads/Cell'] = (stat_df['Number of Reads'].sum() * df.shape[0]/total_reads)/len(barcodes)
+        stat_dict['Number of Reads'] = stat_df['Number of Reads'].sum()
+        for s in species:
+            stat_dict['%s Fraction Reads in Cells' %s] = digital_count_matrix[:,species_gene_inds[s]].sum()/\
+                                                                             df.query('genome=="%s"' %s, engine='python').shape[0]
+            stat_dict['%s Median UMIs/Cell' %s] = np.median(species_umi_counts[s].iloc[np.where(species_assignments==s)])
+            stat_dict['%s Median UMIs/Cell @50%% Dup' %s]  = stat_dict['%s Median UMIs/Cell' %s] * 0.5 /stat_dict['Sequencing Saturation']
+            stat_dict['%s Median Genes/Cell' %s] = np.median(species_gene_counts[s].iloc[np.where(species_assignments==s)])
+            stat_dict['%s Number of Cells Detected' %s] = sum(species_assignments==s)
+        stat_dict['Fraction Reads in Cells'] = digital_count_matrix.sum()/df.shape[0]
 
     stat_catagories = ['Estimated Number of Cells']
     for s in species:
@@ -487,7 +518,7 @@ def generate_single_dge_report(output_dir,genome_dir,chemistry,sample_name='',su
         stat_catagories.append('%s dT Fraction' %s)
     
     # Save summary stats to csv
-    pd.Series(stat_dict).loc[stat_catagories].to_csv(output_dir + '/analysis_summary.csv')
+    pd.Series(stat_dict).loc[stat_catagories].to_csv(output_dir + '/' + sample_name +  'analysis_summary.csv')
     
     # Subsample reads
     species_read_proportions = df.groupby('genome').size()/df.groupby('genome').size().sum()
