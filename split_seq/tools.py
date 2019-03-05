@@ -312,6 +312,13 @@ def preprocess_fastq(fastq1, fastq2, output_dir, chemistry='v1', **params):
         bc_8nt_rnd3 = bc_8nt
         # Amplicon sequence
         amp_seq = 'NNNNNNNNNNIIIIIIIIGTGGCCGATGTTTCGCATCGGCGTACGACTIIIIIIIIATCCACGTGCTTGAGACTGTGGIIIIIIII'
+    elif chemistry=='x':
+        bc_8nt_RT = pd.read_csv(PATH + '/barcodes/bc_8nt_v2.csv',names=['barcode'],index_col=0).barcode
+        bc_8nt_3 = pd.read_csv(PATH + '/barcodes/bc_8nt_rnd3_vx.csv',names=['barcode'],index_col=0).barcode
+        bc_8nt_rnd2 = bc_8nt
+        bc_8nt_rnd3 = bc_8nt_3
+        # Amplicon sequence
+        amp_seq = 'NNNNNNNNNNIIIIIIIIGTGGCCGATGTTTCGCATCGGCGTACGACTIIIIIIIIATCCACGTGCTTGAGACTGTGGIIIIIIII'
     else:
         bc_8nt_RT = pd.read_csv(PATH + '/barcodes/bc_8nt_v2.csv',names=['barcode'],index_col=0).barcode
         bc_8nt_rnd2 = pd.read_csv(PATH + '/barcodes/bc_8nt_rnd2_v2.csv',names=['barcode'],index_col=0).barcode
