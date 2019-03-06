@@ -219,7 +219,7 @@ def generate_single_dge_report(output_dir,genome_dir,chemistry,sample_name='',su
     gene_id_to_genome = gene_info['gene_id_to_genome']
 
     # Load the RT barcodes to collapse randhex with dT primers
-    bc_8nt = pd.read_csv('/home/ubuntu/split-seq-pipeline/split_seq/barcodes/bc_8nt_%s.csv'  %chemistry,
+    bc_8nt = pd.read_csv(PATH + '/barcodes/bc_8nt_%s.csv'  %chemistry,
                          index_col=0,
                          names=['barcode']).barcode
     bc_to_well = dict(zip(bc_8nt.values,range(96)))
@@ -227,7 +227,7 @@ def generate_single_dge_report(output_dir,genome_dir,chemistry,sample_name='',su
     bc_8nt_randhex_dt_dict = dict(zip(bc_8nt.values,['dt']*48+['randhex']*48))
     
     # Load the Ligation barcodes:
-    bc_8nt_lig = pd.read_csv('/home/ubuntu/split-seq-pipeline/split_seq/barcodes/bc_8nt_v1.csv',
+    bc_8nt_lig = pd.read_csv(PATH + '/barcodes/bc_8nt_v1.csv',
                          index_col=0,
                          names=['barcode']).barcode
     bc_to_well_lig = dict(zip(bc_8nt_lig.values,range(96)))
@@ -350,7 +350,7 @@ def generate_single_dge_report(output_dir,genome_dir,chemistry,sample_name='',su
         kmer_len = 30
         rrna_sense_kmer_dict = {}
         rrna_antisense_kmer_dict = {}
-        with open('/home/ubuntu/split-seq-pipeline/split_seq/rRNA.fa') as f:
+        with open(PATH + '/rRNA.fa') as f:
             while True:
                 line = f.readline()[:-1]
                 if len(line)==0:
@@ -367,7 +367,7 @@ def generate_single_dge_report(output_dir,genome_dir,chemistry,sample_name='',su
         kmer_len = 30
         mt_rrna_sense_kmer_dict = {}
         mt_rrna_antisense_kmer_dict = {}
-        with open('/home/ubuntu/split-seq-pipeline/split_seq/mt_rRNA.fa') as f:
+        with open(PATH + '/mt_rRNA.fa') as f:
             while True:
                 line = f.readline()[:-1]
                 if len(line)==0:
