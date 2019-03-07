@@ -49,6 +49,7 @@ split-seq mkref --genome hg38 mm10 \
 ## Running the pipeline
 
 To see all options, run `split-seq -h`.
+
 ~~~~
 split-seq all --fq1 input_R1.fastq.gz \
               --fq2 input_R2.fastq.gz \
@@ -61,3 +62,15 @@ split-seq all --fq1 input_R1.fastq.gz \
               --sample sample_name3 C1:D6 \
               --sample sample_name4 C7:D12
 ~~~~
+
+## Merging Sublibraries into a Single Matrix
+
+~~~~
+split-seq combine --output_dir <output_dir> \
+                  --sublibraries <path_to_sublibrary1> <path_to_sublibrary2> ...
+                  --chemistry v2
+                  --genome_dir <path_to_genome_dir>
+                  --sample sample_name1 <wells>
+~~~~
+
+## References

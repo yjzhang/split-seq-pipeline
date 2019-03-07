@@ -42,6 +42,7 @@ parser.add_argument('--genome', nargs='*', help='name(s) of genome(s)/species')
 parser.add_argument('--genes', nargs='*', help='GTF file(s) with gene annotations')
 parser.add_argument('--fasta', nargs='*', help='List of FASTA files for the given genome(s). There should be one fasta file per genome.')
 parser.add_argument('--nthreads', default='4', help='number of threads to use')
+parser.add_argument('--sublibraries',nargs='*',help='paths to output directories of each sublibrary')
 
 args = parser.parse_args()
 
@@ -52,7 +53,7 @@ print(args.fq2)
 print(args.output_dir)
 print(args.chemistry)
 print(args.genome_dir)
-
+print(args.sublibraries)
 mode = args.mode.lower()
 if mode == 'mkref':
     print(args.genome)
@@ -115,5 +116,12 @@ if mode=='dge':
     valid_samples = analysis.check_valid_samples(args.sample)
     if valid_samples:
         analysis.generate_all_dge_reports(args.output_dir,args.genome_dir,args.chemistry,args.sample)
+    else:
+        print('Samples were entered with incorrect format. Use split-seq -h for more information')
+
+if mode == 'combine':
+    valid_samples = analysis.check_valid_samples(args.sample)
+    if valid_samples:
+        analysis.generate_all_dge_reports(args.output_dir, args.genome_dir, args.chemistry, args.sample, sublibraries=args.sublibraries)
     else:
         print('Samples were entered with incorrect format. Use split-seq -h for more information')
