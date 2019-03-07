@@ -219,7 +219,7 @@ def generate_single_dge_report(output_dir,genome_dir,chemistry,sample_name='',su
     gene_id_to_genome = gene_info['gene_id_to_genome']
 
     # Load the RT barcodes to collapse randhex with dT primers
-    bc_8nt = pd.read_csv('/home/ubuntu/split-seq-pipeline/split_seq/barcodes/bc_8nt_%s.csv'  %chemistry,
+    bc_8nt = pd.read_csv(PATH + '/barcodes/bc_8nt_%s.csv'  %chemistry,
                          index_col=0,
                          names=['barcode']).barcode
     bc_to_well = dict(zip(bc_8nt.values,range(96)))
@@ -227,7 +227,7 @@ def generate_single_dge_report(output_dir,genome_dir,chemistry,sample_name='',su
     bc_8nt_randhex_dt_dict = dict(zip(bc_8nt.values,['dt']*48+['randhex']*48))
     
     # Load the Ligation barcodes:
-    bc_8nt_lig = pd.read_csv('/home/ubuntu/split-seq-pipeline/split_seq/barcodes/bc_8nt_v1.csv',
+    bc_8nt_lig = pd.read_csv(PATH + '/barcodes/bc_8nt_v1.csv',
                          index_col=0,
                          names=['barcode']).barcode
     bc_to_well_lig = dict(zip(bc_8nt_lig.values,range(96)))
