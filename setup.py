@@ -35,6 +35,9 @@ setup(
     install_requires=[
         'numpy',
         'pysam',
+        'pandas',
+        'scipy',
+        'matplotlib',
     ],
     zip_safe=False,
     package_data={'split_seq': ['barcodes/*.csv']},
