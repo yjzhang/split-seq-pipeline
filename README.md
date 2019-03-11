@@ -85,6 +85,6 @@ The first folder contains the read mappings and read assignments. Some important
 
 The `DGE_filtered` and `DGE_unfiltered` folders contain digital gene expression matrices. In `DGE_filtered`, the cells are filtered by a minimum read threshold, and only cells pasing that threshold are included.
 
-In these two folders, `DGE.mtx` is a sparse matrix (Matrix Market format) of shape cells by genes that contains the gene expression of every gene for each cell. `genes.csv` contains the name of each gene.
+In these two folders, `DGE.mtx` is a sparse matrix (Matrix Market format) of shape cells by genes that contains the gene expression of every gene for each cell. `genes.csv` contains the name of each gene, where the index is the same as in `DGE.mtx`.
 
 ## References
