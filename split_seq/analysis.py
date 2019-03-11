@@ -435,33 +435,29 @@ def generate_single_dge_report(output_dir,genome_dir,chemistry,sample_name='',su
                         well_counts['mt_rRNA_antisense_counts'][well] += 1
         read_len = max(read_lengths.keys())
         read_len_trimmed = read_len - 30
-        ####
-        print(well_counts['rRNA_sense_counts'])
-        ####
         tso_fraction = read_lengths[read_len_trimmed]/sum(read_lengths.values())
         cols = ['rRNA_sense_counts','rRNA_antisense_counts','total_counts']
-        well_rrna_counts = pd.DataFrame(well_counts)[cols].reindex([sub_wells+list(np.array(sub_wells)+48)])
-        well_rrna_counts_dt = pd.DataFrame(well_rrna_counts).reindex([sub_wells])
-        well_rrna_counts_randhex = pd.DataFrame(well_rrna_counts).reindex([list(np.array(sub_wells)+48)])
+        well_rrna_counts = pd.DataFrame(well_counts)[cols].reindex(sub_wells+list(np.array(sub_wells)+48)).fillna(0)
+        well_rrna_counts_dt = pd.DataFrame(well_rrna_counts).reindex(sub_wells)
+        well_rrna_counts_randhex = pd.DataFrame(well_rrna_counts).reindex(list(np.array(sub_wells)+48))
         well_rrna_fraction = (well_rrna_counts.T/well_rrna_counts.total_counts).T.iloc[:,:2]
         well_rrna_fraction_dt = (well_rrna_counts_dt.T/well_rrna_counts_dt.total_counts).T.iloc[:,:2]
         well_rrna_fraction_randhex = (well_rrna_counts_randhex.T/well_rrna_counts_randhex.total_counts).T.iloc[:,:2]
         rrna_fraction = well_rrna_counts.sum(0).iloc[:2]/well_rrna_counts.sum(0).iloc[2]
         rrna_fraction_dt = well_rrna_counts_dt.sum(0).iloc[:2]/well_rrna_counts_dt.sum(0).iloc[2]
         rrna_fraction_randhex = well_rrna_counts_randhex.sum(0).iloc[:2]/well_rrna_counts_randhex.sum(0).iloc[2]
-        ####
-        print(rrna_fraction)
-        ####
+        
         cols = ['mt_rRNA_sense_counts','mt_rRNA_antisense_counts','total_counts']
-        well_mt_rrna_counts = pd.DataFrame(well_counts)[cols].loc[sub_wells+list(np.array(sub_wells)+48)]
-        well_mt_rrna_counts_dt = pd.DataFrame(well_mt_rrna_counts).loc[sub_wells]
-        well_mt_rrna_counts_randhex = pd.DataFrame(well_mt_rrna_counts).loc[list(np.array(sub_wells)+48)]
+        well_mt_rrna_counts = pd.DataFrame(well_counts).fillna(0)[cols].reindex(sub_wells+list(np.array(sub_wells)+48))
+        well_mt_rrna_counts_dt = pd.DataFrame(well_mt_rrna_counts).reindex(sub_wells)
+        well_mt_rrna_counts_randhex = pd.DataFrame(well_mt_rrna_counts).reindex(list(np.array(sub_wells)+48))
         well_mt_rrna_fraction = (well_mt_rrna_counts.T/well_mt_rrna_counts.total_counts).T.iloc[:,:2]
         well_mt_rrna_fraction_dt = (well_mt_rrna_counts_dt.T/well_mt_rrna_counts_dt.total_counts).T.iloc[:,:2]
         well_mt_rrna_fraction_randhex = (well_mt_rrna_counts_randhex.T/well_mt_rrna_counts_randhex.total_counts).T.iloc[:,:2]
         mt_rrna_fraction = well_mt_rrna_counts.sum(0).iloc[:2]/well_mt_rrna_counts.sum(0).iloc[2]
         mt_rrna_fraction_dt = well_mt_rrna_counts_dt.sum(0).iloc[:2]/well_mt_rrna_counts_dt.sum(0).iloc[2]
         mt_rrna_fraction_randhex = well_mt_rrna_counts_randhex.sum(0).iloc[:2]/well_mt_rrna_counts_randhex.sum(0).iloc[2]
+        pd.DataFrame(well_counts).fillna(0).reindex(sub_wells+list(np.array(sub_wells)+48)).to_csv(output_dir + sample_name + 'rRNA_count.csv')
         
         stat_dict = {}
         with open(output_dir + '/pipeline_stats.txt') as f:
