@@ -392,27 +392,52 @@ def generate_single_dge_report(output_dir,genome_dir,chemistry,sample_name='',su
             return found
         
         fastqfile = output_dir + '/single_cells_barcoded_head.fastq'
-        well_counts = defaultdict(Counter)
-        read_lengths = Counter()
-        with open(fastqfile) as f:
-            for i in range(1000000):
-                header = f.readline()
-                seq = f.readline()[:-1]
-                f.readline()
-                f.readline()
-                well = bc_to_well[header[17:17+8]]
-                well_counts['total_counts'][well] += 1
-                read_lengths[len(seq)]+=1
-                if search_kmers(seq,rrna_sense_kmer_dict):
-                    well_counts['rRNA_sense_counts'][well] += 1
-                if search_kmers(seq,rrna_antisense_kmer_dict):
-                    well_counts['rRNA_antisense_counts'][well] += 1
-                if search_kmers(seq,mt_rrna_sense_kmer_dict):
-                    well_counts['mt_rRNA_sense_counts'][well] += 1
-                if search_kmers(seq,mt_rrna_antisense_kmer_dict):
-                    well_counts['mt_rRNA_antisense_counts'][well] += 1
+        if os.path.isfile(fastqfile):
+            well_counts = defaultdict(Counter)
+            read_lengths = Counter()
+            with open(fastqfile) as f:
+                for i in range(1000000):
+                    header = f.readline()
+                    seq = f.readline()[:-1]
+                    f.readline()
+                    f.readline()
+                    well = bc_to_well[header[17:17+8]]
+                    well_counts['total_counts'][well] += 1
+                    read_lengths[len(seq)]+=1
+                    if search_kmers(seq,rrna_sense_kmer_dict):
+                        well_counts['rRNA_sense_counts'][well] += 1
+                    if search_kmers(seq,rrna_antisense_kmer_dict):
+                        well_counts['rRNA_antisense_counts'][well] += 1
+                    if search_kmers(seq,mt_rrna_sense_kmer_dict):
+                        well_counts['mt_rRNA_sense_counts'][well] += 1
+                    if search_kmers(seq,mt_rrna_antisense_kmer_dict):
+                        well_counts['mt_rRNA_antisense_counts'][well] += 1
+        else:
+            fastqfile = fastqfile + '.gz'
+            well_counts = defaultdict(Counter)
+            read_lengths = Counter()
+            with gzip.open(fastqfile) as f:
+                for i in range(1000000):
+                    header = f.readline().decode()
+                    seq = f.readline().decode()[:-1]
+                    f.readline()
+                    f.readline()
+                    well = bc_to_well[header[17:17+8]]
+                    well_counts['total_counts'][well] += 1
+                    read_lengths[len(seq)]+=1
+                    if search_kmers(seq,rrna_sense_kmer_dict):
+                        well_counts['rRNA_sense_counts'][well] += 1
+                    if search_kmers(seq,rrna_antisense_kmer_dict):
+                        well_counts['rRNA_antisense_counts'][well] += 1
+                    if search_kmers(seq,mt_rrna_sense_kmer_dict):
+                        well_counts['mt_rRNA_sense_counts'][well] += 1
+                    if search_kmers(seq,mt_rrna_antisense_kmer_dict):
+                        well_counts['mt_rRNA_antisense_counts'][well] += 1
         read_len = max(read_lengths.keys())
         read_len_trimmed = read_len - 30
+        ####
+        print(well_counts['rRNA_sense_counts'])
+        ####
         tso_fraction = read_lengths[read_len_trimmed]/sum(read_lengths.values())
         cols = ['rRNA_sense_counts','rRNA_antisense_counts','total_counts']
         well_rrna_counts = pd.DataFrame(well_counts)[cols].reindex([sub_wells+list(np.array(sub_wells)+48)])
@@ -424,7 +449,9 @@ def generate_single_dge_report(output_dir,genome_dir,chemistry,sample_name='',su
         rrna_fraction = well_rrna_counts.sum(0).iloc[:2]/well_rrna_counts.sum(0).iloc[2]
         rrna_fraction_dt = well_rrna_counts_dt.sum(0).iloc[:2]/well_rrna_counts_dt.sum(0).iloc[2]
         rrna_fraction_randhex = well_rrna_counts_randhex.sum(0).iloc[:2]/well_rrna_counts_randhex.sum(0).iloc[2]
-        
+        ####
+        print(rrna_fraction)
+        ####
         cols = ['mt_rRNA_sense_counts','mt_rRNA_antisense_counts','total_counts']
         well_mt_rrna_counts = pd.DataFrame(well_counts)[cols].loc[sub_wells+list(np.array(sub_wells)+48)]
         well_mt_rrna_counts_dt = pd.DataFrame(well_mt_rrna_counts).loc[sub_wells]
