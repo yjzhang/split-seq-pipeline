@@ -4,8 +4,17 @@
 # first argument is directory where stuff is to be installed
 DEFAULT_INSTALL_DIR=~/split_seq_reqs
 
-# TODO: allow for user install dir as a custom arg
 install_dir=$DEFAULT_INSTALL_DIR
+if [ -z "$1" ]
+then
+    echo "Default install dir: $install_dir"
+else
+    install_dir=$1
+fi
+
+echo "Installing dependencies to $install_dir"
+
+# TODO: allow for user install dir as a custom arg
 cd $install_dir
 
 mkdir bin
