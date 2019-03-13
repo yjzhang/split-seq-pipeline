@@ -15,6 +15,7 @@ fi
 echo "Installing dependencies to $install_dir"
 
 # TODO: allow for user install dir as a custom arg
+mkdir -p $install_dir
 cd $install_dir
 
 mkdir bin
