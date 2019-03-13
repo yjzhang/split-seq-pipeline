@@ -1,4 +1,4 @@
-FROM python:3.7-slim
+FROM python:3.7
 MAINTAINER Yue Zhang <yjzhang@cs.washington.edu>
 
 WORKDIR /split_seq_pipeline
