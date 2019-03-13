@@ -40,7 +40,7 @@ setup(
         'matplotlib',
     ],
     zip_safe=False,
-    package_data={'split_seq': ['barcodes/*.csv']},
+    package_data={'split_seq': ['barcodes/*.csv', 'rRNA.fa']},
     include_package_data=True,
     # TODO: commenting this out; the user can run install_dependencies on their own.
     #cmdclass={'install': CustomInstall},

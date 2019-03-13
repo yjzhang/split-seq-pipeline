@@ -9,7 +9,7 @@ COPY . /split_seq_pipeline
 
 RUN sh install_dependencies.sh /split-seq-reqs
 
-RUN pip install .
+RUN pip install -e .
 
 RUN cp split-seq /split-seq-reqs/bin
 
