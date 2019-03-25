@@ -324,7 +324,7 @@ def preprocess_fastq(fastq1, fastq2, output_dir, chemistry='v1', **params):
         counts = bc_df.query('bc1_valid & bc2_valid & bc3_valid')\
                       .groupby(['bc1','bc2','bc3']).size().sort_values(ascending=False)
         count_threshold = counts.iloc[abs(counts.cumsum()/counts.sum()-reads_in_cells_thresh).values.argmin()]
-        return counts,count_threshold
+        return counts.to_dict(),count_threshold
 
 
     counts,count_threshold = get_perfect_bc_counts(fastq2,n_reads=2000000,reads_in_cells_thresh=0.92)
