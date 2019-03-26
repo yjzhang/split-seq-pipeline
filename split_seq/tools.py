@@ -203,113 +203,83 @@ def generate_STAR_index(output_dir, nthreads):
     star_command = """STAR  --runMode genomeGenerate --genomeDir {0} --genomeFastaFiles {0}/genome.fa --sjdbGTFfile {0}/exons.gtf --runThreadN {1} --limitGenomeGenerateRAM 16000000000""".format(output_dir, nthreads)
     rc = subprocess.call(star_command, shell=True)
     return rc
-                        
+
+bases = list('ACGT')
+def convert_degen_seq_to_list(seq):
+    """Uses recursion to convert a degenerate sequence to a list
+    For example: AGGN -> [AGGA, AGGC, AGGG, AGGT]"""
+
+    seq_list = []
+    N_pos = seq.find('N')
+    if N_pos>=0:
+        for b in bases:
+            seq_list += convert_degen_seq_to_list(seq[:N_pos] + b + seq[N_pos+1:])
+    else:
+        seq_list.append(seq)
+    return seq_list
+
+def levenshteinDistance(s1, s2):
+    if len(s1) > len(s2):
+        s1, s2 = s2, s1
+    distances = range(len(s1) + 1)
+    for i2, c2 in enumerate(s2):
+        distances_ = [i2+1]
+        for i1, c1 in enumerate(s1):
+            if c1 == c2:
+                distances_.append(distances[i1])
+            else:
+                distances_.append(1 + min((distances[i1], distances[i1 + 1], distances_[-1])))
+        distances = distances_
+    return distances[-1]
+
+def get_min_edit_dists(bc,edit_dict,max_d=3):
+    """Returns a list of nearest edit dist seqs
+    Input 8nt barcode, edit_dist_dictionary
+    Output <list of nearest edit distance seqs>, <edit dist>"""
+    bc_matches = edit_dict[0][bc]
+    edit_dist = 0
+    if (len(bc_matches)==0) and (max_d>=1):
+        edit_dist+=1
+        bc_matches = edit_dict[1][bc]
+    if (len(bc_matches)==0) and (max_d>=2):
+        edit_dist+=1
+        bc_matches = edit_dict[2][bc]
+    if (len(bc_matches)==0) and (max_d>=3):
+        edit_dist+=1
+        bc_matches = edit_dict[3][bc]
+    return bc_matches,edit_dist
+
 def preprocess_fastq(fastq1, fastq2, output_dir, chemistry='v1', **params):
     """
     Performs all the steps before running the alignment. Temporary files
     saved in output_dir.
     """
+    with open(PATH + '/barcodes/bc_dict_v1.pkl', 'rb') as f:
+        edit_dict_v1 = pickle.load(f)
+    with open(PATH + '/barcodes/bc_dict_v2.pkl', 'rb') as f:
+        edit_dict_v2 = pickle.load(f)
+    with open(PATH + '/barcodes/bc_dict_v3.pkl', 'rb') as f:
+        edit_dict_v3 = pickle.load(f)
     
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
-    bases = list('ACGT')
-    def convert_degen_seq_to_list(seq):
-        """Uses recursion to convert a degenerate sequence to a list
-        For example: AGGN -> [AGGA, AGGC, AGGG, AGGT]"""
-
-        seq_list = []
-        N_pos = seq.find('N')
-        if N_pos>=0:
-            for b in bases:
-                seq_list += convert_degen_seq_to_list(seq[:N_pos] + b + seq[N_pos+1:])
-        else:
-            seq_list.append(seq)
-        return seq_list
-
-    def editd1(seq):
-        """Returns the list of sequences with edit distance 1
-        It returns a sequence with the same length. So a base insertion
-        will result in the last base being truncated"""
-
-        seq_len = len(seq)
-
-        # Original sequence
-        edit_seqs = [seq]
-
-        # Insertions
-        for i in range(seq_len):
-            for b in bases:
-                edit_seqs.append(seq[:i] +b + seq[i:-1])
-
-        # Deletions
-        for i in range(seq_len):
-            edit_seqs.append(seq[:i] + seq[i+1:]+'-')
-
-        # Nt changes
-        for i in range(seq_len):
-            for b in bases:
-                if b!=seq[i]:
-                    edit_seqs.append(seq[:i]+b+seq[i+1:])
-
-        # 1nt shift forward
-        edit_seqs.append('-'+seq[:-1])
-
-        # 1nt shift backward
-        edit_seqs.append(seq[1:]+'-')
-
-        # Convert Ns to sequences
-        output_edit_seqs = []
-        for s in edit_seqs:
-            output_edit_seqs += convert_degen_seq_to_list(s)
-
-        return output_edit_seqs
-
-    def bc_editd1_correction(barcodes,bc_pre='',bc_suf=''):
-        pre_len = len(bc_pre)
-        bc_len = len(barcodes[0])
-        suf_len = len(bc_suf)
-        full_seq_len = pre_len + bc_len + suf_len
-        bc_start = (pre_len-1)
-        bc_end = full_seq_len - 1
-
-        bc_dict = defaultdict(list)
-        for bc in barcodes:
-            seqs_d1 = unique([s[bc_start:bc_end] for s in unique(editd1(bc_pre + bc + bc_suf))])
-            [bc_dict[s].append(bc) for s in seqs_d1]
-        bc_map = pd.Series(bc_dict)
-        bc_map = bc_map[bc_map.apply(len)==1].apply(lambda s:s[0]).to_dict()
-
-        # Some perfect matches to barcodes also have sequences 1 edit distance away.
-        # In this case we want to choose the perfect matches. So we need to add the
-        # perfect matches back into the dictionary, since the step above just removed 
-        # them, if there was another d1 sequences.
-        for bc in barcodes:
-            perfect_matches = convert_degen_seq_to_list(bc_pre + bc + bc_suf)
-            for pm in perfect_matches:
-                bc_map[pm[bc_start:bc_end]] = pm[bc_start+1:bc_start+1+bc_len]
-        return bc_map
-
-    def fix_bc(bc,bc_map):
-        try:
-            bc_fixed = bc_map[bc]
-        except:
-            bc_fixed = ''
-        return bc_fixed
 
     # Read in barcode sequences
-    bc_8nt = pd.read_csv(PATH + '/barcodes/bc_8nt_v1.csv',names=['barcode'],index_col=0).barcode
+    bc_8nt_v1 = pd.read_csv(PATH + '/barcodes/bc_8nt_v1.csv',names=['barcode'],index_col=0).barcode.values
+    bc_8nt_v2 = pd.read_csv(PATH + '/barcodes/bc_8nt_v2.csv',names=['barcode'],index_col=0).barcode.values
 
     if chemistry=='v1':
-        bc_8nt_RT = bc_8nt
-        bc_8nt_rnd2 = bc_8nt
-        bc_8nt_rnd3 = bc_8nt
+        bc1_edit_dict = edit_dict_v1
+        bc2_edit_dict = edit_dict_v1
+        bc3_edit_dict = edit_dict_v1
         # Amplicon sequence
         amp_seq = 'NNNNNNNNNNIIIIIIIIGTGGCCGATGTTTCGCATCGGCGTACGACTIIIIIIIIATCCACGTGCTTGAGAGGCCAGAGCATTCGIIIIIIII'
     elif chemistry=='v2':
-        bc_8nt_RT = pd.read_csv(PATH + '/barcodes/bc_8nt_v2.csv',names=['barcode'],index_col=0).barcode
-        bc_8nt_rnd2 = bc_8nt
-        bc_8nt_rnd3 = bc_8nt
+        bc1_edit_dict = edit_dict_v1
+        bc2_edit_dict = edit_dict_v1
+        bc3_edit_dict = edit_dict_v2
+
         # Amplicon sequence
         amp_seq = 'NNNNNNNNNNIIIIIIIIGTGGCCGATGTTTCGCATCGGCGTACGACTIIIIIIIIATCCACGTGCTTGAGACTGTGGIIIIIIII'
     elif chemistry=='x':
@@ -337,25 +307,75 @@ def preprocess_fastq(fastq1, fastq2, output_dir, chemistry='v1', **params):
         bc_starts.append(bc_loc + c)
         c = bc_starts[-1] + bc_len
 
-    # Generate bc_map dictionary for each cell barcode.
-    bc3_pre = amp_seq[bc_starts[0]-2:bc_starts[0]]
-    bc3_suf = amp_seq[bc_starts[0]+8:bc_starts[0]+10]
-    bc3_map = bc_editd1_correction(bc_8nt_rnd3.values,
-                                   bc_pre=bc3_pre,
-                                   bc_suf=bc3_suf)
+    print(bc_starts)
 
-    bc2_pre = amp_seq[bc_starts[1]-2:bc_starts[1]]
-    bc2_suf = amp_seq[bc_starts[1]+8:bc_starts[1]+10]
-    bc2_map = bc_editd1_correction(bc_8nt_rnd2.values,
-                                   bc_pre=bc2_pre,
-                                   bc_suf=bc2_suf)
-    bc1_pre = amp_seq[bc_starts[2]-2:bc_starts[2]]
-    bc1_suf = 'N'
-    bc1_map = bc_editd1_correction(bc_8nt_RT.values,
-                                   bc_pre=bc1_pre,
-                                   bc_suf=bc1_suf)
+    def get_perfect_bc_counts(fastq2,n_reads=2000000,reads_in_cells_thresh=0.92):
+        quality_scores = []
+        seqs = []
+        with gzip.open(fastq2) as f:
+            for i in range(n_reads):
+                f.readline()
+                seq = f.readline().decode()[:-1]
+                f.readline()
+                qual = f.readline()
+                seqs.append(seq)
+                quality_scores.append(qual)
+                if i %100000==0:
+                    print(i,end=' ')
+        seqs = pd.Series(seqs)
+        bc_df = pd.DataFrame()
+        bc_df['bc1'] = seqs.str.slice(bc_starts[0],bc_starts[0]+8)
+        bc_df['bc2'] = seqs.str.slice(bc_starts[1],bc_starts[1]+8)
+        bc_df['bc3'] = seqs.str.slice(bc_starts[2],bc_starts[2]+8)
+        bc_df['bc1_valid'] = bc_df['bc1'].apply(lambda s: s in bc_8nt_v1)
+        bc_df['bc2_valid'] = bc_df['bc2'].apply(lambda s: s in bc_8nt_v1)
+        if chemistry=='v1':
+            bc_df['bc3_valid'] = bc_df['bc3'].apply(lambda s: s in bc_8nt_v1)
+        elif chemistry=='v2':
+            bc_df['bc3_valid'] = bc_df['bc3'].apply(lambda s: s in bc_8nt_v2)
 
-    
+        counts = bc_df.query('bc1_valid & bc2_valid & bc3_valid')\
+                      .groupby(['bc1','bc2','bc3']).size().sort_values(ascending=False)
+        count_threshold = counts.iloc[abs(counts.cumsum()/counts.sum()-reads_in_cells_thresh).values.argmin()]
+        return counts.to_dict(),count_threshold
+
+
+    counts,count_threshold = get_perfect_bc_counts(fastq2,n_reads=2000000,reads_in_cells_thresh=0.92)
+
+    def correct_barcodes(bc1,bc2,bc3, counts, count_thresh,
+                     bc1_dict=bc1_edit_dict,
+                     bc2_dict=bc2_edit_dict,
+                     bc3_dict=bc3_edit_dict
+                    ):
+        bc1_matches,edit_dist1 = get_min_edit_dists(bc1,bc1_dict)
+        bc2_matches,edit_dist2  = get_min_edit_dists(bc2,bc2_dict)
+        bc3_matches,edit_dist3  = get_min_edit_dists(bc3,bc3_dict)
+        # Check if any barcode matches have a counts above the threshold
+
+        if 0==edit_dist1==edit_dist2==edit_dist3:
+            return bc1_matches[0],bc2_matches[0],bc3_matches[0]
+        else:
+            matches = 0
+            for bc1_m in bc1_matches:
+                for bc2_m in bc2_matches:
+                    for bc3_m in bc3_matches:
+                        try:
+                            cur_counts = counts[(bc1_m,bc2_m,bc3_m)]
+                        except:
+                            cur_counts = 0
+                        if cur_counts>count_thresh:
+                            bc1_fixed = bc1_m
+                            bc2_fixed = bc2_m
+                            bc3_fixed = bc3_m
+                            matches += 1
+            #print('Fixed:',matches,\
+            #      'Nearest_bcs',(len(bc1_matches),len(bc2_matches),len(bc3_matches)),\
+            #      'Edit_dist',(edit_dist1,edit_dist2,edit_dist3))
+            if matches==1:
+                return (bc1_fixed,bc2_fixed,bc3_fixed)
+            else:
+                return '','',''
+
     fastq_reads = 0
     fastq_valid_barcode_reads = 0
     with gzip.open(fastq1,'rb') as f1, gzip.open(fastq2,'rb') as f2, open(output_dir + '/single_cells_barcoded_head.fastq','w') as fout:
@@ -364,13 +384,14 @@ def preprocess_fastq(fastq1, fastq2, output_dir, chemistry='v1', **params):
             if len(header2)==0:
                 break
             seq2 = f2.readline().decode("utf-8")
-            bc1 = fix_bc(seq2[bc_starts[2]-1:bc_starts[2]+bc_len],bc1_map)
-            bc2 = fix_bc(seq2[bc_starts[1]-1:bc_starts[1]+bc_len+1],bc2_map)
-            bc3 = fix_bc(seq2[bc_starts[0]-1:bc_starts[0]+bc_len+1],bc3_map)
+            bc1 = seq2[bc_starts[0]:bc_starts[0]+bc_len]
+            bc2 = seq2[bc_starts[1]:bc_starts[1]+bc_len]
+            bc3 = seq2[bc_starts[2]:bc_starts[2]+bc_len]
+
             umi = seq2[:10]
             strand2 = f2.readline()
             qual2 = f2.readline()
-            
+            bc1,bc2,bc3 = correct_barcodes(bc1,bc2,bc3, counts, count_threshold)
             cellbc_umi = bc3 + bc2 + bc1 +'_' + umi
             header1 = f1.readline().decode("utf-8")
             seq1 = f1.readline().decode("utf-8")
@@ -382,7 +403,7 @@ def preprocess_fastq(fastq1, fastq2, output_dir, chemistry='v1', **params):
                 if 0<=TSO_location<20:
                     seq1 = seq1[TSO_location+30:]
                     qual1 = qual1[TSO_location+30:]
-                header1 = '@' + bc3 + bc2 + bc1 +'_' + umi + '_' + qual2.decode("utf-8")[:10] + '_' + header1[1:]
+                header1 = '@' + bc1 + bc2 + bc3 +'_' + umi + '_' + qual2.decode("utf-8")[:10] + '_' + header1[1:]
                 fout.write(header1)
                 fout.write(seq1)
                 fout.write(strand1)
