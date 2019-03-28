@@ -398,6 +398,8 @@ def generate_single_dge_report(output_dir,genome_dir,chemistry,sample_name='',su
             with open(fastqfile) as f:
                 for i in range(1000000):
                     header = f.readline()
+                    if len(header)==0:
+                        break
                     seq = f.readline()[:-1]
                     f.readline()
                     f.readline()
@@ -419,6 +421,8 @@ def generate_single_dge_report(output_dir,genome_dir,chemistry,sample_name='',su
             with gzip.open(fastqfile) as f:
                 for i in range(1000000):
                     header = f.readline().decode()
+                    if len(header)==0:
+                        break
                     seq = f.readline().decode()[:-1]
                     f.readline()
                     f.readline()
@@ -467,11 +471,23 @@ def generate_single_dge_report(output_dir,genome_dir,chemistry,sample_name='',su
                     break
                 k,v = line.split('\t')
                 stat_dict[k] = int(v)
+        with open(output_dir + '/sequencing_stats.txt') as f:
+            while True:
+                line = f.readline()[:-1]
+                if len(line)==0:
+                    break
+                k,v = line.split('\t')
+                stat_dict[k] = float(v)
         stat_dict['Estimated Number of Cells'] = len(barcodes)
         stat_dict['Mean Reads/Cell'] = (stat_dict['fastq_reads'] * df.shape[0]/total_reads)/len(barcodes)
         stat_dict['Number of Reads'] = stat_dict['fastq_reads'] * df.shape[0]/total_reads
         stat_dict['Sequencing Saturation'] = 1-df.shape[0]/df.counts.sum()
         stat_dict['Valid Barcode Fraction'] = stat_dict['fastq_valid_barcode_reads']/stat_dict['fastq_reads']
+        stat_dict['BC1 (RT) >Q30'] = stat_dict['bc1_Q30']
+        stat_dict['BC2 >Q30'] = stat_dict['bc2_Q30']
+        stat_dict['BC3 >Q30'] = stat_dict['bc3_Q30']
+        stat_dict['UMI >Q30'] = stat_dict['umi_Q30']
+        stat_dict['cDNA >Q30'] = stat_dict['cDNA_Q30']
         stat_dict['Reads Mapped to rRNA'] = rrna_fraction.iloc[:2].sum()
         stat_dict['Reads Mapped to rRNA (dT)'] = rrna_fraction_dt.iloc[:2].sum()
         stat_dict['Reads Mapped to rRNA (randhex)'] = rrna_fraction_randhex.iloc[:2].sum()
@@ -521,6 +537,11 @@ def generate_single_dge_report(output_dir,genome_dir,chemistry,sample_name='',su
                         'Number of Reads',
                         'Sequencing Saturation',
                         'Valid Barcode Fraction',
+                        'BC1 (RT) >Q30',
+                        'BC2 >Q30',
+                        'BC3 >Q30',
+                        'UMI >Q30',
+                        'cDNA >Q30',
                         'Reads Mapped to rRNA',
                         'Reads Mapped to rRNA (dT)',
                         'Reads Mapped to rRNA (randhex)',
@@ -583,7 +604,7 @@ def generate_single_dge_report(output_dir,genome_dir,chemistry,sample_name='',su
     h = 1
     c =0
     for k in stat_catagories:
-        if c < (4*len(species)+2):
+        if c < (4*len(species)+3):
             text2write = k+' '*int((34-len(k)))+str(int(np.round(stat_dict[k])))
         else:
             text2write = k+' '*int((34-len(k)))+'%0.3f' %stat_dict[k]

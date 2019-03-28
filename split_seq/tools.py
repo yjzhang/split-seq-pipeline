@@ -200,7 +200,7 @@ def make_gtf_annotations(species, gtf_filenames, output_dir):
         pickle.dump(gene_info, f, pickle.HIGHEST_PROTOCOL)
         
 def generate_STAR_index(output_dir, nthreads):
-    star_command = """STAR  --runMode genomeGenerate --genomeDir {0} --genomeFastaFiles {0}/genome.fa --sjdbGTFfile {0}/exons.gtf --runThreadN {1} --limitGenomeGenerateRAM 16000000000""".format(output_dir, nthreads)
+    star_command = """STAR  --runMode genomeGenerate --genomeDir {0} --genomeFastaFiles {0}/genome.fa --sjdbGTFfile {0}/exons.gtf --runThreadN {1} --limitGenomeGenerateRAM 24000000000""".format(output_dir, nthreads)
     rc = subprocess.call(star_command, shell=True)
     return rc
 
@@ -365,6 +365,11 @@ def preprocess_fastq(fastq1, fastq2, output_dir, chemistry='v1', **params):
 
     fastq_reads = 0
     fastq_valid_barcode_reads = 0
+    bc1_Q30_sum = 0
+    bc2_Q30_sum = 0
+    bc3_Q30_sum = 0
+    umi_Q30_sum = 0
+    cDNA_Q30_sum = 0
     with gzip.open(fastq1,'rb') as f1, gzip.open(fastq2,'rb') as f2, open(output_dir + '/single_cells_barcoded_head.fastq','w') as fout:
         while True:
             header2 = f2.readline()
@@ -374,12 +379,12 @@ def preprocess_fastq(fastq1, fastq2, output_dir, chemistry='v1', **params):
             bc1 = seq2[bc_starts[0]:bc_starts[0]+bc_len]
             bc2 = seq2[bc_starts[1]:bc_starts[1]+bc_len]
             bc3 = seq2[bc_starts[2]:bc_starts[2]+bc_len]
-
             umi = seq2[:10]
             strand2 = f2.readline()
-            qual2 = f2.readline()
+            qual2 = f2.readline().decode("utf-8")
             bc1,bc2,bc3 = correct_barcodes(bc1,bc2,bc3, counts, count_threshold)
             cellbc_umi = bc3 + bc2 + bc1 +'_' + umi
+
             header1 = f1.readline().decode("utf-8")
             seq1 = f1.readline().decode("utf-8")
             strand1 = f1.readline().decode("utf-8")
@@ -390,14 +395,27 @@ def preprocess_fastq(fastq1, fastq2, output_dir, chemistry='v1', **params):
                 if 0<=TSO_location<20:
                     seq1 = seq1[TSO_location+30:]
                     qual1 = qual1[TSO_location+30:]
-                header1 = '@' + bc1 + bc2 + bc3 +'_' + umi + '_' + qual2.decode("utf-8")[:10] + '_' + header1[1:]
+                header1 = '@' + bc1 + bc2 + bc3 +'_' + umi + '_' + qual2[:10] + '_' + header1[1:]
                 fout.write(header1)
                 fout.write(seq1)
                 fout.write(strand1)
                 fout.write(qual1)
                 fastq_valid_barcode_reads += 1
             fastq_reads += 1
-
+            # bc1 refers to the first barcode seen in the sequencing read, but is actually
+            # bc3 in terms of rounds
+            if fastq_reads<1000000:
+                bc1_Q30_sum += np.mean([ord(c)>62 for c in qual2[bc_starts[0]:bc_starts[0]+bc_len]])
+                bc2_Q30_sum += np.mean([ord(c)>62 for c in qual2[bc_starts[1]:bc_starts[1]+bc_len]])
+                bc3_Q30_sum += np.mean([ord(c)>62 for c in qual2[bc_starts[2]:bc_starts[2]+bc_len]])
+                umi_Q30_sum += np.mean([ord(c)>62 for c in qual2[:10]])
+                cDNA_Q30_sum += np.mean([ord(c)>62 for c in qual1[:-1]])
+    with open(output_dir + '/sequencing_stats.txt', 'w') as f:
+        f.write('bc1_Q30\t%0.4f\n' %(bc3_Q30_sum/min(fastq_reads,1000000)))
+        f.write('bc2_Q30\t%0.4f\n' %(bc2_Q30_sum/min(fastq_reads,1000000)))
+        f.write('bc3_Q30\t%0.4f\n' %(bc1_Q30_sum/min(fastq_reads,1000000)))
+        f.write('umi_Q30\t%0.4f\n' %(umi_Q30_sum/min(fastq_reads,1000000)))
+        f.write('cDNA_Q30\t%0.4f\n' %(cDNA_Q30_sum/min(fastq_reads,1000000)))
     with open(output_dir + '/pipeline_stats.txt', 'w') as f:
         f.write('fastq_reads\t%d\n' %fastq_reads)
         f.write('fastq_valid_barcode_reads\t%d\n' %fastq_valid_barcode_reads)
