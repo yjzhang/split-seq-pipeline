@@ -73,8 +73,9 @@ def get_attribute(s,att):
         att_value = ''
     return att_value
         
-def make_gtf_annotations(species, gtf_filenames, output_dir):
-    
+def make_gtf_annotations(species, gtf_filenames, output_dir, splicing):
+    splicing = splicing=='True'
+
     # Load the GTFs
     names = ['Chromosome',
          'Source',
@@ -110,18 +111,18 @@ def make_gtf_annotations(species, gtf_filenames, output_dir):
                              'TR_J_pseudogene',
                              'TR_V_gene',
                              'TR_V_pseudogene']
-    
-    # Generate a combined GTF with only the gene annotations
-    gtf_gene_combined = gtfs[species[0]].query('Feature=="gene"')
-    gtf_gene_combined.loc[:,'Chromosome'] = species[0] + '_' + gtf_gene_combined.Chromosome.apply(lambda s:str(s))
-    for i in range(1,len(species)):
-        gtf_gene_combined_temp = gtfs[species[i]].query('Feature=="gene"')
-        gtf_gene_combined_temp.loc[:,'Chromosome'] = species[i] + '_' + gtf_gene_combined_temp.Chromosome.apply(lambda s:str(s))
-        gtf_gene_combined = pd.concat([gtf_gene_combined,gtf_gene_combined_temp])
-    gene_biotypes = gtf_gene_combined.Attributes.apply(lambda s: get_attribute(s,'gene_biotype'))
-    #gtf_gene_combined = gtf_gene_combined.iloc[np.where(gene_biotypes.isin(gene_biotypes_to_keep).values)]
-    gtf_gene_combined.index = range(len(gtf_gene_combined))
-    gtf_gene_combined.to_csv(output_dir + '/genes.gtf',sep='\t',index=False)
+    if splicing:
+        # Generate a combined GTF with only the gene annotations
+        gtf_gene_combined = gtfs[species[0]].query('Feature=="gene"')
+        gtf_gene_combined.loc[:,'Chromosome'] = species[0] + '_' + gtf_gene_combined.Chromosome.apply(lambda s:str(s))
+        for i in range(1,len(species)):
+            gtf_gene_combined_temp = gtfs[species[i]].query('Feature=="gene"')
+            gtf_gene_combined_temp.loc[:,'Chromosome'] = species[i] + '_' + gtf_gene_combined_temp.Chromosome.apply(lambda s:str(s))
+            gtf_gene_combined = pd.concat([gtf_gene_combined,gtf_gene_combined_temp])
+        gene_biotypes = gtf_gene_combined.Attributes.apply(lambda s: get_attribute(s,'gene_biotype'))
+        #gtf_gene_combined = gtf_gene_combined.iloc[np.where(gene_biotypes.isin(gene_biotypes_to_keep).values)]
+        gtf_gene_combined.index = range(len(gtf_gene_combined))
+        gtf_gene_combined.to_csv(output_dir + '/genes.gtf',sep='\t',index=False)
     
     # Generate a combined GTF with only the exon annotations
     gtf_exon_combined = gtfs[species[0]].query('Feature=="exon"')
@@ -135,6 +136,10 @@ def make_gtf_annotations(species, gtf_filenames, output_dir):
     gtf_exon_combined.index = range(len(gtf_exon_combined))
     gtf_exon_combined.to_csv(output_dir + '/exons.gtf',sep='\t',index=False)
     
+    if not splicing:
+        gtf_gene_combined = gtf_exon_combined.copy(deep=True)
+        gtf_gene_combined['Feature'] = 'gene'
+        gtf_gene_combined.to_csv(output_dir + '/genes.gtf',sep='\t',index=False)
     # Get locations of genes. We are using the longest possible span of different transcripts here
     gtf_gene_combined.loc[:,'gene_id'] = gtf_gene_combined.Attributes.apply(lambda s: get_attribute(s,'gene_id'))
     gene_starts = gtf_gene_combined.groupby('gene_id').Start.apply(min)
@@ -199,8 +204,12 @@ def make_gtf_annotations(species, gtf_filenames, output_dir):
     with open(output_dir+ '/gene_info.pkl', 'wb') as f:
         pickle.dump(gene_info, f, pickle.HIGHEST_PROTOCOL)
         
-def generate_STAR_index(output_dir, nthreads):
-    star_command = """STAR  --runMode genomeGenerate --genomeDir {0} --genomeFastaFiles {0}/genome.fa --sjdbGTFfile {0}/exons.gtf --runThreadN {1} --limitGenomeGenerateRAM 24000000000""".format(output_dir, nthreads)
+def generate_STAR_index(output_dir, nthreads,genomeSAindexNbases,splicing):
+    splicing = (splicing=='True')
+    if splicing:
+        star_command = """STAR  --runMode genomeGenerate --genomeDir {0} --genomeFastaFiles {0}/genome.fa --sjdbGTFfile {0}/exons.gtf --runThreadN {1} --limitGenomeGenerateRAM 24000000000 --genomeSAindexNbases {2}""".format(output_dir, nthreads, genomeSAindexNbases)
+    else:
+        star_command = """STAR  --runMode genomeGenerate --genomeDir {0} --genomeFastaFiles {0}/genome.fa --runThreadN {1} --limitGenomeGenerateRAM 24000000000 --genomeSAindexNbases {2}""".format(output_dir, nthreads, genomeSAindexNbases)
     rc = subprocess.call(star_command, shell=True)
     return rc
 

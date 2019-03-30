@@ -39,7 +39,9 @@ parser.add_argument('--sample', action='append', nargs=2, metavar=('SAMPLE_NAME'
 #parser.add_argument('--star_path', default='./', help='path containing STAR')
 parser.add_argument('--genome', nargs='*', help='name(s) of genome(s)/species')
 parser.add_argument('--genes', nargs='*', help='GTF file(s) with gene annotations')
-parser.add_argument('--fasta', nargs='*', help='GTF file(s) with gene annotations')
+parser.add_argument('--fasta', nargs='*', help='fasta file for genome(s)')
+parser.add_argument('--splicing',default='True', help='whether genome has splicing')
+parser.add_argument('--genomeSAindexNbases',default='14', help='set this to min(14, floor(log2(GenomeLength)/2 - 1))')
 parser.add_argument('--nthreads', default='4', help='number of threads to use')
 parser.add_argument('--sublibraries',nargs='*',help='paths to output directories of each sublibrary')
 
@@ -60,10 +62,10 @@ if mode == 'mkref':
     tools.make_combined_genome(args.genome, args.fasta, args.output_dir)
     
     # Make a combine annotation from GTF
-    tools.make_gtf_annotations(args.genome, args.genes, args.output_dir)
+    tools.make_gtf_annotations(args.genome, args.genes, args.output_dir, args.splicing)
     
     # Index genome with star
-    tools.generate_STAR_index(args.output_dir, args.nthreads)
+    tools.generate_STAR_index(args.output_dir, args.nthreads, args.genomeSAindexNbases, args.splicing)
 
 if mode == 'debug':
     # Add barcode and UMI to header of read1 fastq
