@@ -262,8 +262,8 @@ def molecule_info_chunk(transcriptome_dir, output_dir, chunk=None, gtf_dict_step
                     df_collapsed.loc[:,'exonic'] = exonic_fraction.loc[list(zip(df_collapsed.gene.values,
                                                                              df_collapsed.umi.values))].values>0.5
                     df_collapsed['cell_barcode'] = cell_barcodes[0]
-                    df_collapsed.loc[:,'gene_name'] = df.gene.apply(lambda s:gene_id_to_name[s])
-                    df_collapsed.loc[:,'genome'] = df.gene.apply(lambda s:gene_id_to_genome[s])
+                    df_collapsed.loc[:,'gene_name'] = df_collapsed.gene.apply(lambda s:gene_id_to_name[s])
+                    df_collapsed.loc[:,'genome'] = df_collapsed.gene.apply(lambda s:gene_id_to_genome[s])
                     df_collapsed[['cell_barcode','genome','gene','gene_name','umi','counts','exonic']].to_csv(output_filename,
                                                                    header=False,
                                                                    index=False,
