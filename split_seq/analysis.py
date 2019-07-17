@@ -63,7 +63,7 @@ def barnyard(cell_data,tickstep=10000,s=4,lim=None,ax=None,fig=None):
     #sb.set_style("ticks")
     
     if ax is None:
-        fig = figure(figsize=(3,3))
+        fig = plt.figure(figsize=(3,3))
         ax = fig.add_subplot(111)
     counts1 = cell_data.iloc[:,0]
     counts2 = cell_data.iloc[:,1]
@@ -130,9 +130,12 @@ def get_read_threshold(read_counts):
     threshold = 10**y_hat.iloc[np.argmax(y_hat_prime)]*0.5
     return threshold
 
-def plot_read_thresh(read_counts,fig=None,ax=None):
+def plot_read_thresh(read_counts, fig=None, ax=None, read_thresh=None):
     window = 4
-    read_threshold = get_read_threshold(read_counts[read_counts>2])
+    if read_thresh is None:
+        read_threshold = get_read_threshold(read_counts[read_counts>2])
+    else:
+        read_threshold = float(read_thresh)
     threshold = len(read_counts[read_counts>read_threshold])
     median_umis = read_counts.sort_values(ascending=False)[:threshold].median()
     if ax is None:
@@ -191,14 +194,14 @@ def check_valid_samples(samples):
                 return False
     return True
  
-def generate_all_dge_reports(output_dir, genome_dir, chemistry, samples, sublibraries=None):
+def generate_all_dge_reports(output_dir, genome_dir, chemistry, samples, sublibraries=None, read_thresh=None):
     if len(samples)>0:
         for i in range(len(samples)):
             sample_name = samples[i][0]
             sub_wells = parse_wells(samples[i][1])
-            generate_single_dge_report(output_dir,genome_dir,chemistry,sample_name=sample_name,sub_wells=sub_wells,sublibraries=sublibraries)
+            generate_single_dge_report(output_dir,genome_dir,chemistry,sample_name=sample_name,sub_wells=sub_wells,sublibraries=sublibraries, read_thresh=read_thresh)
     else:
-        generate_single_dge_report(output_dir,genome_dir,chemistry,sublibraries=sublibraries)
+        generate_single_dge_report(output_dir,genome_dir,chemistry,sublibraries=sublibraries, read_thresh=read_thresh)
     
     # gzip fastq file to save space
     if (not ('single_cells_barcoded_head.fastq.gz' in os.listdir(output_dir))) and (sublibraries is None):
@@ -261,7 +264,7 @@ def generate_single_dge_report(output_dir,genome_dir,chemistry,sample_name='',su
     else:
         sub_wells = list(range(48))
     read_counts = df.groupby('cell_barcode').size().sort_values(ascending=False)
-    fig,ax,read_thresh = plot_read_thresh(read_counts)
+    fig,ax,read_thresh = plot_read_thresh(read_counts, read_thresh=read_thresh)
 
     digital_count_matrix,all_genes,barcodes = generate_dge_matrix(df,read_cutoff=10)
 
@@ -622,7 +625,7 @@ def generate_single_dge_report(output_dir,genome_dir,chemistry,sample_name='',su
         c+=1
     ax.set_axis_off()
     ax = fig.add_axes([0.5,0.65,0.35,0.35])
-    _ = plot_read_thresh(read_counts,ax=ax)
+    _ = plot_read_thresh(read_counts,ax=ax, read_thresh=read_thresh)
     ax.set_title(sample_name[:-1])
 
     if len(species)==2:
