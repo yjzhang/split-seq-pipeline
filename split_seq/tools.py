@@ -258,7 +258,7 @@ def get_min_edit_dists(bc,edit_dict,max_d=3):
         bc_matches = edit_dict[3][bc]
     return bc_matches,edit_dist
 
-def preprocess_fastq(fastq1, fastq2, output_dir, chemistry='v1', **params):
+def preprocess_fastq(fastq1, fastq2, output_dir, chemistry='v1', bc_edit_dist=3, **params):
     """
     Performs all the steps before running the alignment. Temporary files
     saved in output_dir.
@@ -273,6 +273,7 @@ def preprocess_fastq(fastq1, fastq2, output_dir, chemistry='v1', **params):
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
+    bc_edit_dist = int(bc_edit_dist)
 
     # Read in barcode sequences
     bc_8nt_v1 = pd.read_csv(PATH + '/barcodes/bc_8nt_v1.csv',names=['barcode'],index_col=0).barcode.values
@@ -345,7 +346,7 @@ def preprocess_fastq(fastq1, fastq2, output_dir, chemistry='v1', **params):
 
         counts = bc_df.query('bc1_valid & bc2_valid & bc3_valid')\
                       .groupby(['bc1','bc2','bc3']).size().sort_values(ascending=False)
-        count_threshold = counts.iloc[abs(counts.cumsum()/counts.sum()-reads_in_cells_thresh).values.argmin()]
+        count_threshold = max(5, counts.iloc[abs(counts.cumsum()/counts.sum()-reads_in_cells_thresh).values.argmin()])
         return counts.to_dict(),count_threshold
 
 
@@ -356,9 +357,9 @@ def preprocess_fastq(fastq1, fastq2, output_dir, chemistry='v1', **params):
                      bc2_dict=bc2_edit_dict,
                      bc3_dict=bc3_edit_dict
                     ):
-        bc1_matches,edit_dist1 = get_min_edit_dists(bc1,bc1_dict)
-        bc2_matches,edit_dist2  = get_min_edit_dists(bc2,bc2_dict)
-        bc3_matches,edit_dist3  = get_min_edit_dists(bc3,bc3_dict)
+        bc1_matches,edit_dist1 = get_min_edit_dists(bc1,bc1_dict,max_d=bc_edit_dist)
+        bc2_matches,edit_dist2  = get_min_edit_dists(bc2,bc2_dict,max_d=bc_edit_dist)
+        bc3_matches,edit_dist3  = get_min_edit_dists(bc3,bc3_dict,max_d=bc_edit_dist)
         # Check if any barcode matches have a counts above the threshold
 
         if 0==edit_dist1==edit_dist2==edit_dist3:

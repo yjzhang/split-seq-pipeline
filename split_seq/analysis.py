@@ -393,7 +393,11 @@ def generate_single_dge_report(output_dir,genome_dir,chemistry,sample_name='',su
         
         fastqfile = output_dir + '/single_cells_barcoded_head.fastq'
         if os.path.isfile(fastqfile):
-            well_counts = defaultdict(Counter)
+            well_counts = {'total_counts':Counter(),
+                           'rRNA_sense_counts':Counter(),
+                           'rRNA_antisense_counts':Counter(),
+                           'mt_rRNA_sense_counts':Counter(),
+                           'mt_rRNA_antisense_counts':Counter()}
             read_lengths = Counter()
             with open(fastqfile) as f:
                 for i in range(1000000):
@@ -416,7 +420,12 @@ def generate_single_dge_report(output_dir,genome_dir,chemistry,sample_name='',su
                         well_counts['mt_rRNA_antisense_counts'][well] += 1
         else:
             fastqfile = fastqfile + '.gz'
-            well_counts = defaultdict(Counter)
+            well_counts = {'total_counts':Counter(),
+                           'rRNA_sense_counts':Counter(),
+                           'rRNA_antisense_counts':Counter(),
+                           'mt_rRNA_sense_counts':Counter(),
+                           'mt_rRNA_antisense_counts':Counter()}
+
             read_lengths = Counter()
             with gzip.open(fastqfile) as f:
                 for i in range(1000000):
