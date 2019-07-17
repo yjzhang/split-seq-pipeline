@@ -136,6 +136,8 @@ def plot_read_thresh(read_counts, fig=None, ax=None, read_thresh=None):
         read_threshold = get_read_threshold(read_counts[read_counts>2])
     else:
         read_threshold = float(read_thresh)
+        if read_threshold <= 2:
+            read_threshold = get_read_threshold(read_counts[read_counts>2])
     threshold = len(read_counts[read_counts>read_threshold])
     median_umis = read_counts.sort_values(ascending=False)[:threshold].median()
     if ax is None:

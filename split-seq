@@ -21,7 +21,7 @@ parser.add_argument('--genome_dir', default='./', help='path containing referenc
 parser.add_argument('--sample', action='append', default=[], nargs=2, metavar=('SAMPLE_NAME','WELLS'),
                      help='Add a sample_name followed by the range of wells. A1:B6 specifies A1:A6,B1:B6,C1:C6. A1-B6 specifies A1-A12,B1-6. Multiple selections can be made by adding a comma (no space), e.g. A1-A6,B1-B3')
 parser.add_argument('--bc_edit_dist', default='2', help='Maximum edit distance that will be corrected for barcodes in each round')
-parser.add_argument('--umi_threshold', default=0, help='Minimum number of UMIs to include for a cell.')
+parser.add_argument('--umi_threshold', default=0, help='Minimum number of UMIs to include for a cell.', type=int)
 # TODO: this is currently unused
 #parser.add_argument('--star_path', default='./', help='path containing STAR')
 parser.add_argument('--genome', nargs='*', help='name(s) of genome(s)/species')
@@ -84,7 +84,7 @@ if mode == 'all':
         processv2.molecule_info(args.genome_dir, args.output_dir, args.nthreads)
 
         print(datetime.datetime.now(),'Generating digital gene expression matrix...') 
-        analysis.generate_all_dge_reports(args.output_dir, args.genome_dir, args.chemistry, args.sample)
+        analysis.generate_all_dge_reports(args.output_dir, args.genome_dir, args.chemistry, args.sample, read_thresh=args.umi_threshold)
 
         print(datetime.datetime.now(),'Finished successfully')
     else:
