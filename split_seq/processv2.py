@@ -284,24 +284,25 @@ def molecule_info_chunk(transcriptome_dir, output_dir, chunk=None, gtf_dict_step
             sys.stdout.flush()
 
     # Handle the data for the last cell barcode combination
-    df = pd.DataFrame({'cell_barcodes':cell_barcodes,
-                       'umi':umis,
-                       'gene':pd.Series(genes),
-                       'exonic':exonic_assignments,
-                       'umi_quality':umi_quals})
-    df_collapsed = collapse_umis_dataframe(df)
-    df_collapsed = df_collapsed.reset_index()
-    df_collapsed.columns = ['gene','umi','counts']
-    exonic_fraction = df.groupby(['gene','umi']).exonic.mean()
-    df_collapsed.loc[:,'exonic'] = exonic_fraction.loc[list(zip(df_collapsed.gene.values,
-                                                             df_collapsed.umi.values))].values>0.5
-    df_collapsed['cell_barcode'] = cell_barcodes[0]
-    df_collapsed.loc[:,'gene_name'] = df_collapsed.gene.apply(lambda s:gene_id_to_name[s])
-    df_collapsed.loc[:,'genome'] = df_collapsed.gene.apply(lambda s:gene_id_to_genome[s])
-    df_collapsed[['cell_barcode','genome','gene','gene_name','umi','counts','exonic']].to_csv(output_filename,
-                                                   header=False,
-                                                   index=False,
-                                                   mode='a')
+    if c>0:
+        df = pd.DataFrame({'cell_barcodes':cell_barcodes,
+                           'umi':umis,
+                           'gene':pd.Series(genes),
+                           'exonic':exonic_assignments,
+                           'umi_quality':umi_quals})
+        df_collapsed = collapse_umis_dataframe(df)
+        df_collapsed = df_collapsed.reset_index()
+        df_collapsed.columns = ['gene','umi','counts']
+        exonic_fraction = df.groupby(['gene','umi']).exonic.mean()
+        df_collapsed.loc[:,'exonic'] = exonic_fraction.loc[list(zip(df_collapsed.gene.values,
+                                                                 df_collapsed.umi.values))].values>0.5
+        df_collapsed['cell_barcode'] = cell_barcodes[0]
+        df_collapsed.loc[:,'gene_name'] = df_collapsed.gene.apply(lambda s:gene_id_to_name[s])
+        df_collapsed.loc[:,'genome'] = df_collapsed.gene.apply(lambda s:gene_id_to_genome[s])
+        df_collapsed[['cell_barcode','genome','gene','gene_name','umi','counts','exonic']].to_csv(output_filename,
+                                                       header=False,
+                                                       index=False,
+                                                       mode='a')
 
     samfile.close()
 
