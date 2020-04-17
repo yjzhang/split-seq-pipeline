@@ -182,6 +182,13 @@ def parse_wells(s):
                 e_row = row_letter_to_number[end[:1]]
                 e_col = int(end[1:])-1
                 sub_wells += list(np.arange(wells[s_row,s_col],wells[e_row,e_col]+1))
+            else:
+                start = b
+                s_row = row_letter_to_number[start[:1]]
+                s_col = int(start[1:])-1
+                e_row = row_letter_to_number[start[:1]]
+                e_col = int(start[1:])
+                sub_wells += list(wells[s_row:e_row+1,s_col:e_col].flatten())
         sub_wells = list(np.unique(sub_wells))
     except:
         sub_wells = 'Failed'
