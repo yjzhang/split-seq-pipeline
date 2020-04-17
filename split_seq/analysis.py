@@ -186,8 +186,8 @@ def parse_wells(s):
                 start = b
                 s_row = row_letter_to_number[start[:1]]
                 s_col = int(start[1:])-1
-                e_row = s_row
-                e_col = s_col
+                e_row = row_letter_to_number[start[:1]]
+                e_col = int(start[1:])
                 sub_wells += list(wells[s_row:e_row+1,s_col:e_col].flatten())
         sub_wells = list(np.unique(sub_wells))
     except:
